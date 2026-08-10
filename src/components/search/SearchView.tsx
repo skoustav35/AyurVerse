@@ -51,7 +51,7 @@ export default function SearchView() {
     queryKey: ['search', query, filter],
     enabled: query.length > 0,
     placeholderData: (prev) => prev,
-    queryFn: () => apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(query)}${kindParam}`),
+    queryFn: () => apiFetch<SearchResponse & { meta?: { fallback?: boolean } }>(`/api/search?q=${encodeURIComponent(query)}${kindParam}`),
   });
 
   useEffect(() => {
@@ -72,6 +72,7 @@ export default function SearchView() {
 
   const posts = data?.posts ?? [];
   const people = data?.people ?? [];
+  const isFallback = data?.meta?.fallback ?? false;
   const videos = posts.filter((p) => p.media_type === 'video');
   const images = posts.filter((p) => p.media_type === 'image');
   const lore = posts.filter((p) => p.kind === 'forge');
@@ -192,9 +193,17 @@ export default function SearchView() {
       {query && (
         <div className="mt-6">
           {!empty && data && (
-            <p className="mb-4 text-[11.5px] font-medium text-ink-400">
-              {posts.length + (showPeople ? people.length : 0)} results · ranked by relevance × engagement × freshness
-            </p>
+            <div className="mb-4 text-[11.5px] font-medium text-ink-400">
+              {isFallback ? (
+                <p className="text-saffron-600">
+                  We couldn't find an exact match for "{query}". Here are some popular discoveries instead:
+                </p>
+              ) : (
+                <p>
+                  {posts.length + (showPeople ? people.length : 0)} results · ranked by relevance × engagement × freshness
+                </p>
+              )}
+            </div>
           )}
           {empty ? (
             <div className="text-center py-14">

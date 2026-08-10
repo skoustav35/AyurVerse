@@ -107,10 +107,26 @@ export default async function handler(req, res) {
     }
 
     scored.sort((a, b) => b.score - a.score || b.p.id - a.p.id);
-    const items = scored.slice(0, 30).map((s) => s.p);
+    let items = scored.slice(0, 30).map((s) => s.p);
+    let isFallback = false;
+
+    // Fallback if no posts match
+    if (items.length === 0) {
+      isFallback = true;
+      const fallbackPosts = posts
+        .filter(p => {
+          if (kind === 'forge' && p.kind !== 'forge') return false;
+          if (kind === 'video' && p.media_type !== 'video') return false;
+          if (kind === 'image' && p.media_type !== 'image') return false;
+          return true;
+        })
+        .sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
+        .slice(0, 10);
+      items = fallbackPosts;
+    }
 
     const { data: peopleRows } = await supabase.from('profiles').select('*').limit(120);
-    const scoredPeople = (peopleRows || [])
+    let scoredPeople = (peopleRows || [])
       .map((pr) => {
         const un = (pr.username || '').toLowerCase();
         const fn = (pr.full_name || '').toLowerCase();
@@ -129,7 +145,13 @@ export default async function handler(req, res) {
       .slice(0, 6)
       .map((x) => x.pr);
 
-    return res.status(200).json({ posts: items, people: scoredPeople, meta: { terms: terms.length, ranked: scored.length } });
+    // Fallback for people
+    if (scoredPeople.length === 0 && (items.length === 0 || isFallback)) {
+       scoredPeople = (peopleRows || []).slice(0, 3);
+       isFallback = true;
+    }
+
+    return res.status(200).json({ posts: items, people: scoredPeople, meta: { terms: terms.length, ranked: scored.length, fallback: isFallback } });
   } catch (err) {
     console.error('search error:', err);
     res.status(500).json({ error: err.message });
