@@ -7,7 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# dependencies (the only thing excluded — reinstall with `npm install`)
 node_modules
+
+# build output
 dist
 dist-ssr
 *.local
@@ -22,11 +25,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.vite-source-tags.js
-.vercel
 
-# secrets — NEVER commit these (contain live API keys)
-.env
-.env.*
-!.env.example
-vercel.json
+# NOTE: this is a PRIVATE repo — .env and vercel.json ARE committed on purpose
+# so it can be hosted on Vercel directly. Keep the repo private.
