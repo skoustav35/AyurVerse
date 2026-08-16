@@ -1307,23 +1307,35 @@ async def live(duration_hours: float, bots_limit: int) -> None:
         print("[live] no weavers seated — run `provision` first")
         return
     llm_ok = await llm_probe()
+    forever = duration_hours <= 0
     print(f"[live] {len(rows)} weavers · llm "
           f"{'online at ' + C.LLM_BASE_URL + ' (' + C.LLM_MODEL + ')' if llm_ok else 'NOT reachable — heuristic fallback active'}")
-    print(f"[live] mode={C.MODE} app={C.APP_URL or '(direct lane)'} db={C.SUPABASE_URL}")
+    print(f"[live] mode={C.MODE} app={C.APP_URL or '(direct lane)'} db={C.SUPABASE_URL} · "
+          + ("running until interrupted" if forever else f"for {duration_hours}h"))
 
     gate = asyncio.Semaphore(C.BOT_CONCURRENCY)
 
-    async def gated(row: dict) -> None:
-        async with gate:
-            await Bot(row).run()
+    async def supervised(row: dict) -> None:
+        """A weaver who stumbles gets up quietly and returns to the loom."""
+        backoff = 5
+        while not STOP.is_set():
+            async with gate:
+                try:
+                    await Bot(row).run()
+                    return  # only a clean STOP exits normally
+                except asyncio.CancelledError:
+                    return
+                except Exception as e:
+                    print(f"[supervisor] weaver {row['idx']} fell ({e}); re-seating in {backoff}s")
+                    await asyncio.sleep(backoff)
+                    backoff = min(180, backoff * 2)
 
     async def heartbeat() -> None:
         status_path = Path(__file__).resolve().parent / "society.status.json"
         while not STOP.is_set():
             await asyncio.sleep(60)
             t = totals()
-            line = "[heartbeat] " + " · ".join(f"{k}={v}" for k, v in sorted(t.items()))
-            print(line)
+            print("[heartbeat] " + " · ".join(f"{k}={v}" for k, v in sorted(t.items())))
             try:
                 status_path.write_text(json.dumps({
                     "alive_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -1335,19 +1347,20 @@ async def live(duration_hours: float, bots_limit: int) -> None:
             except OSError:
                 pass
 
-    tasks = [asyncio.create_task(gated(r)) for r in rows]
+    tasks = [asyncio.create_task(supervised(r)) for r in rows]
     hb = asyncio.create_task(heartbeat())
     try:
-        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True),
-                               duration_hours * 3600)
+        bundle = asyncio.gather(*tasks, return_exceptions=True)
+        if forever:
+            await bundle
+        else:
+            await asyncio.wait_for(bundle, duration_hours * 3600)
     except asyncio.TimeoutError:
         pass
     finally:
         STOP.set()
         hb.cancel()
         print("[live] society resting. lifetime ledger:", json.dumps(totals()))
-
-
 async def selftest() -> bool:
     checks: list[tuple[str, bool]] = []
 
