@@ -122,6 +122,18 @@ export default async function handler(req, res) {
     notifs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const recent = notifs.slice(0, 14);
 
+    // -------- liveness proof: who is awake this quarter-hour --------
+    const liveCut = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const hourCut = new Date(Date.now() - 3600 * 1000).toISOString();
+    const recentSignalsLive = await fetchIn('signals', ids, 'user_id', 'user_id, created_at', 400);
+    const liveTail = recentSignalsLive.filter((r) => r.created_at >= liveCut);
+    const hourTail = recentSignalsLive.filter((r) => r.created_at >= hourCut);
+    const liveIds = new Set(liveTail.map((r) => r.user_id));
+    const hourIds = new Set(hourTail.map((r) => r.user_id));
+    const allTimes = [...notifs.map((n) => n.created_at), ...recentSignalsLive.map((r) => r.created_at)].sort();
+    const lastActionAt = allTimes.length ? allTimes[allTimes.length - 1] : null;
+    const secondsSince = lastActionAt ? Math.max(0, Math.round((Date.now() - new Date(lastActionAt).getTime()) / 1000)) : null;
+
     // -------- most active weavers (by recorded likes) --------
     const perUser = new Map();
     for (const r of likeRows) perUser.set(r.user_id, (perUser.get(r.user_id) || 0) + 1);
@@ -136,6 +148,12 @@ export default async function handler(req, res) {
       timeline,
       recent,
       top,
+      liveness: {
+        live_now: liveIds.size,
+        active_last_hour: hourIds.size,
+        last_action_at: lastActionAt,
+        seconds_since_last_action: secondsSince,
+      },
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

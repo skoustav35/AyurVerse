@@ -9,6 +9,12 @@ interface SocietyData {
   timeline: { h: string; likes: number; comments: number }[];
   recent: { actor_name: string; type: string; preview: string | null; created_at: string }[];
   top: { user_id: string; name: string; likes: number }[];
+  liveness?: {
+    live_now: number;
+    active_last_hour: number;
+    last_action_at: string | null;
+    seconds_since_last_action: number | null;
+  };
   generated_at: string;
 }
 
@@ -97,6 +103,41 @@ export default function SocietyView() {
         </div>
         <p className="text-[11px] text-ink-400">as of {ago(data.generated_at)} ago</p>
       </div>
+
+      {/* liveness strip — the proof-of-life readout */}
+      {data.liveness && (
+        <div
+          className={`card-warm px-4 py-3.5 flex items-center gap-3 ${
+            data.liveness.seconds_since_last_action !== null && data.liveness.seconds_since_last_action < 600
+              ? '!border-neem-500/50 bg-neem-500/[0.06]'
+              : '!border-terra-500/40 bg-terra-500/[0.05]'
+          }`}
+        >
+          <span className="relative flex h-2.5 w-2.5 shrink-0">
+            {data.liveness.seconds_since_last_action !== null && data.liveness.seconds_since_last_action < 600 ? (
+              <>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neem-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-neem-600" />
+              </>
+            ) : (
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-terra-500" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-ink-900">
+              {data.liveness.live_now} weaving right now
+              <span className="text-ink-400 font-medium"> · {compact(data.liveness.active_last_hour)} in the last hour</span>
+            </p>
+            <p className="text-[11px] text-ink-500">
+              {data.liveness.seconds_since_last_action === null
+                ? 'no ripples observed yet'
+                : data.liveness.seconds_since_last_action < 600
+                  ? `last ripple ${data.liveness.seconds_since_last_action}s ago — the loom is warm`
+                  : `last ripple ${Math.round(data.liveness.seconds_since_last_action / 60)}m ago — the loom has gone quiet`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">

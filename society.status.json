@@ -1,0 +1,10 @@
+{
+  "alive_at": "2026-08-16T12:55:59Z",
+  "llm_online": true,
+  "weavers": 495,
+  "mode": "direct",
+  "ledger": {
+    "like": 14,
+    "accounts": 495
+  }
+}
