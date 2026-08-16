@@ -59,7 +59,7 @@
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://ducnapzbjqmhjxpmsqez.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_u-WSJ6oD_EabXjdWwi5S_g_iH0y9yqO",
-    "SUPABASE_SERVICE_ROLE_KEY": "<set-via-Secrets-tab>",
+    "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_j2q-UQhjFFfMMx0zFS0ERQ_-IaJRlZz",
     "VITE_SUPABASE_URL": "https://ducnapzbjqmhjxpmsqez.supabase.co",
     "VITE_SUPABASE_ANON_KEY": "sb_publishable_u-WSJ6oD_EabXjdWwi5S_g_iH0y9yqO",
     "VITE_GOOGLE_CLIENT_ID": "1065078894672-rmp5kp8vfjns5rn9kp5psfp16g691043.apps.googleusercontent.com",
