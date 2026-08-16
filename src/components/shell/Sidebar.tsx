@@ -5,7 +5,7 @@ import Avatar from '../common/Avatar';
 import MyCirclesList from '../groups/MyCirclesList';
 import supabase from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useUnreadThreadCount, useNotifications } from '../../hooks/queries';
+import { useUnreadThreadCount, useNotifications, useMyProfile } from '../../hooks/queries';
 import { useUI, type Tab } from '../../store/ui';
 
 const NAV: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -28,8 +28,9 @@ export default function Sidebar() {
   const unreadNotif = notif?.unread ?? 0;
   const { user } = useAuth();
 
-  const displayName = (user?.user_metadata?.full_name as string | undefined) || user?.email?.split('@')[0] || 'weaver';
-  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const meProfile = useMyProfile().data;
+  const displayName = meProfile?.full_name || (user?.user_metadata?.full_name as string | undefined) || user?.email?.split('@')[0] || 'weaver';
+  const avatarUrl = (meProfile?.avatar_url || user?.user_metadata?.avatar_url) as string | undefined;
 
   return (
     <aside className="w-[248px] xl:w-[272px] shrink-0 h-full flex flex-col border-r border-sand-300/70 bg-parchment/80 backdrop-blur-sm relative z-10">

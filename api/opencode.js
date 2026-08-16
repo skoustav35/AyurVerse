@@ -8,14 +8,23 @@
  * both model-id spellings. Returns the first non-empty completion.
  */
 
-const BASE = 'https://opencode.ai/zen/v1';
+// The house gateway — replaced with the caretaker's own AVS gateway.
+// (env override kept for emergencies; the pinned key is the working default.)
+const BASE = process.env.GATEWAY_BASE_URL || 'https://avs-gateway.vercel.app/v1';
+const FALLBACK_KEY = 'gwk-80a9b02c56929571805bb636a0ed7e1f65e09b17a71ad765';
+// The covenant: one house mind — DeepSeek v4 Flash always reasoning at 'high'.
+const HOUSE_EFFORT = 'high';
 // only 'big-pickle' is a valid id on this gateway; the 'opencode/big-pickle'
 // spelling always 401s ("Model not supported"), so we don't waste calls on it.
-const MODELS = ['big-pickle'];
+const MODELS = ['deepseek-v4-flash-free'];
 const HEADERS = ['Authorization', 'x-api-key'];
 
 export function hasKey() {
-  return !!process.env.OPENCODE_API_KEY;
+  return !!(process.env.OPENCODE_API_KEY || process.env.GATEWAY_API_KEY || FALLBACK_KEY);
+}
+
+function gateKey() {
+  return process.env.OPENCODE_API_KEY || process.env.GATEWAY_API_KEY || FALLBACK_KEY;
 }
 
 function extractAnthropic(data) {
@@ -90,7 +99,7 @@ async function attempt({ key, path, authHeader, model, form, system, messages, m
     body = { model, instructions: system, input, max_output_tokens: maxTokens };
   } else {
     const full = system ? [{ role: 'system', content: system }, ...messages.filter((m) => m.role !== 'system')] : messages;
-    body = { model, messages: full, temperature: temperature ?? 0.7, max_tokens: maxTokens };
+    body = { model, messages: full, temperature: temperature ?? 0.7, max_tokens: maxTokens, reasoning_effort: HOUSE_EFFORT };
   }
 
   const res = await fetch(`${BASE}${path}`, {
@@ -126,7 +135,7 @@ async function attempt({ key, path, authHeader, model, form, system, messages, m
  *   - { code:'GATEWAY_DOWN' }  when every attempt failed with a real error
  */
 export async function chat({ system, messages, maxTokens = 2000, temperature = 0.7 }) {
-  const key = process.env.OPENCODE_API_KEY;
+  const key = gateKey();
   if (!key) {
     const err = new Error('OPENCODE_API_KEY is not set');
     err.code = 'NO_KEY';

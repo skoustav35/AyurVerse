@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 import { notifyMany } from './notify.js';
 
 async function getAuthUser(req) {
@@ -18,7 +18,7 @@ const toTags = (t) =>
 const slugify = (s) => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
 
 async function loadMeta(userId, user) {
-  const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+  const { data: profile } = await db.from('profiles').select('*').eq('user_id', userId).maybeSingle();
   const fallbackName = user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : 'weaver');
   return {
     author_name: profile?.full_name || fallbackName,
@@ -38,13 +38,14 @@ async function memberInfo(groupIds, userId) {
 }
 
 async function refreshCount(groupId) {
-  const { count } = await supabase.from('group_members').select('*', { count: 'exact', head: true }).eq('group_id', groupId);
-  await supabase.from('groups').update({ member_count: count || 0 }).eq('id', groupId);
+  const { count } = await db.from('group_members').select('*', { count: 'exact', head: true }).eq('group_id', groupId);
+  await db.from('groups').update({ member_count: count || 0 }).eq('id', groupId);
   return count || 0;
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
       // one group's full detail
       if (id) {
         const gid = parseInt(id, 10);
-        const { data: group, error } = await supabase.from('groups').select('*').eq('id', gid).maybeSingle();
+        const { data: group, error } = await db.from('groups').select('*').eq('id', gid).maybeSingle();
         if (error) throw error;
         if (!group) return res.status(404).json({ error: 'Group not found' });
 
@@ -71,7 +72,7 @@ export default async function handler(req, res) {
           .limit(200);
         const ids = (members || []).map((m) => m.user_id);
         const { data: profs } = ids.length
-          ? await supabase.from('profiles').select('user_id, username, full_name, avatar_url').in('user_id', ids)
+          ? await db.from('profiles').select('user_id, username, full_name, avatar_url').in('user_id', ids)
           : { data: [] };
         const byId = new Map((profs || []).map((p) => [p.user_id, p]));
         const roster = (members || []).map((m) => ({
@@ -95,10 +96,10 @@ export default async function handler(req, res) {
       // my groups
       if (mine === '1') {
         if (!user) return res.status(401).json({ error: 'Sign in required' });
-        const { data: mem } = await supabase.from('group_members').select('group_id, role').eq('user_id', user.id);
+        const { data: mem } = await db.from('group_members').select('group_id, role').eq('user_id', user.id);
         const ids = (mem || []).map((m) => m.group_id);
         if (!ids.length) return res.status(200).json({ groups: [] });
-        let q = supabase.from('groups').select('*').in('id', ids).order('member_count', { ascending: false });
+        let q = db.from('groups').select('*').in('id', ids).order('member_count', { ascending: false });
         if (kind && KINDS.has(kind)) q = q.eq('kind', kind);
         const { data: groups } = await q;
         const roleById = new Map((mem || []).map((m) => [m.group_id, m.role]));
@@ -106,7 +107,7 @@ export default async function handler(req, res) {
       }
 
       // discovery list (popular)
-      let q = supabase.from('groups').select('*').order('member_count', { ascending: false }).limit(discover ? 24 : 60);
+      let q = db.from('groups').select('*').order('member_count', { ascending: false }).limit(discover ? 24 : 60);
       if (kind && KINDS.has(kind)) q = q.eq('kind', kind);
       const { data: groups } = await q;
       const mineMap = await memberInfo((groups || []).map((g) => g.id), user?.id);
@@ -125,16 +126,16 @@ export default async function handler(req, res) {
       if (action === 'join') {
         const gid = parseInt(req.body?.group_id, 10);
         if (!gid) return res.status(400).json({ error: 'group_id required' });
-        const { data: group } = await supabase.from('groups').select('*').eq('id', gid).maybeSingle();
+        const { data: group } = await db.from('groups').select('*').eq('id', gid).maybeSingle();
         if (!group) return res.status(404).json({ error: 'Group not found' });
-        const { data: existing } = await supabase.from('group_members').select('id').eq('group_id', gid).eq('user_id', user.id).maybeSingle();
+        const { data: existing } = await db.from('group_members').select('id').eq('group_id', gid).eq('user_id', user.id).maybeSingle();
         if (existing) return res.status(200).json({ ok: true, already: true });
-        const { error } = await supabase.from('group_members').insert({ group_id: gid, user_id: user.id, role: 'member' });
+        const { error } = await db.from('group_members').insert({ group_id: gid, user_id: user.id, role: 'member' });
         if (error) throw error;
         // thread-groups: also add to the backing conversation
         if (group.kind === 'thread' && group.conversation_id) {
-          const { data: inConv } = await supabase.from('conversation_members').select('id').eq('conversation_id', group.conversation_id).eq('user_id', user.id).maybeSingle();
-          if (!inConv) await supabase.from('conversation_members').insert({ conversation_id: group.conversation_id, user_id: user.id });
+          const { data: inConv } = await db.from('conversation_members').select('id').eq('conversation_id', group.conversation_id).eq('user_id', user.id).maybeSingle();
+          if (!inConv) await db.from('conversation_members').insert({ conversation_id: group.conversation_id, user_id: user.id });
         }
         const count = await refreshCount(gid);
         await notifyMany([group.owner_id], { actor: user, type: 'group_join', preview: `joined ${group.name}` });
@@ -145,11 +146,11 @@ export default async function handler(req, res) {
       if (action === 'leave') {
         const gid = parseInt(req.body?.group_id, 10);
         if (!gid) return res.status(400).json({ error: 'group_id required' });
-        const { data: group } = await supabase.from('groups').select('*').eq('id', gid).maybeSingle();
+        const { data: group } = await db.from('groups').select('*').eq('id', gid).maybeSingle();
         if (group && group.owner_id === user.id) return res.status(400).json({ error: 'The owner cannot leave — transfer or delete the group instead' });
-        await supabase.from('group_members').delete().eq('group_id', gid).eq('user_id', user.id);
+        await db.from('group_members').delete().eq('group_id', gid).eq('user_id', user.id);
         if (group?.kind === 'thread' && group.conversation_id) {
-          await supabase.from('conversation_members').delete().eq('conversation_id', group.conversation_id).eq('user_id', user.id);
+          await db.from('conversation_members').delete().eq('conversation_id', group.conversation_id).eq('user_id', user.id);
         }
         const count = await refreshCount(gid);
         return res.status(200).json({ ok: true, member_count: count });
@@ -160,24 +161,24 @@ export default async function handler(req, res) {
         const gid = parseInt(req.body?.group_id, 10);
         const targetId = String(req.body?.user_id || '');
         if (!gid || !targetId) return res.status(400).json({ error: 'group_id and user_id required' });
-        const { data: me } = await supabase.from('group_members').select('role').eq('group_id', gid).eq('user_id', user.id).maybeSingle();
+        const { data: me } = await db.from('group_members').select('role').eq('group_id', gid).eq('user_id', user.id).maybeSingle();
         if (me?.role !== 'admin') return res.status(403).json({ error: 'Only admins may manage members' });
-        const { data: group } = await supabase.from('groups').select('*').eq('id', gid).maybeSingle();
+        const { data: group } = await db.from('groups').select('*').eq('id', gid).maybeSingle();
 
         if (action === 'add_member') {
-          const { data: exists } = await supabase.from('group_members').select('id').eq('group_id', gid).eq('user_id', targetId).maybeSingle();
-          if (!exists) await supabase.from('group_members').insert({ group_id: gid, user_id: targetId, role: 'member' });
+          const { data: exists } = await db.from('group_members').select('id').eq('group_id', gid).eq('user_id', targetId).maybeSingle();
+          if (!exists) await db.from('group_members').insert({ group_id: gid, user_id: targetId, role: 'member' });
           if (group?.kind === 'thread' && group.conversation_id) {
-            const { data: inConv } = await supabase.from('conversation_members').select('id').eq('conversation_id', group.conversation_id).eq('user_id', targetId).maybeSingle();
-            if (!inConv) await supabase.from('conversation_members').insert({ conversation_id: group.conversation_id, user_id: targetId });
+            const { data: inConv } = await db.from('conversation_members').select('id').eq('conversation_id', group.conversation_id).eq('user_id', targetId).maybeSingle();
+            if (!inConv) await db.from('conversation_members').insert({ conversation_id: group.conversation_id, user_id: targetId });
           }
         } else if (action === 'promote') {
-          await supabase.from('group_members').update({ role: 'admin' }).eq('group_id', gid).eq('user_id', targetId);
+          await db.from('group_members').update({ role: 'admin' }).eq('group_id', gid).eq('user_id', targetId);
         } else if (action === 'remove_member') {
           if (group?.owner_id === targetId) return res.status(400).json({ error: 'Cannot remove the owner' });
-          await supabase.from('group_members').delete().eq('group_id', gid).eq('user_id', targetId);
+          await db.from('group_members').delete().eq('group_id', gid).eq('user_id', targetId);
           if (group?.kind === 'thread' && group.conversation_id) {
-            await supabase.from('conversation_members').delete().eq('conversation_id', group.conversation_id).eq('user_id', targetId);
+            await db.from('conversation_members').delete().eq('conversation_id', group.conversation_id).eq('user_id', targetId);
           }
         }
         const count = await refreshCount(gid);
@@ -202,7 +203,7 @@ export default async function handler(req, res) {
           .single();
         if (cErr) throw cErr;
         conversation_id = conv.id;
-        await supabase.from('conversation_members').insert({ conversation_id, user_id: user.id });
+        await db.from('conversation_members').insert({ conversation_id, user_id: user.id });
       }
 
       const { data: group, error } = await supabase
@@ -223,7 +224,7 @@ export default async function handler(req, res) {
         .single();
       if (error) throw error;
 
-      await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id, role: 'admin' });
+      await db.from('group_members').insert({ group_id: group.id, user_id: user.id, role: 'admin' });
       return res.status(201).json({ group });
     }
 
@@ -231,7 +232,7 @@ export default async function handler(req, res) {
     if (req.method === 'PUT') {
       const gid = parseInt(req.body?.id, 10);
       if (!gid) return res.status(400).json({ error: 'id required' });
-      const { data: me } = await supabase.from('group_members').select('role').eq('group_id', gid).eq('user_id', user.id).maybeSingle();
+      const { data: me } = await db.from('group_members').select('role').eq('group_id', gid).eq('user_id', user.id).maybeSingle();
       if (me?.role !== 'admin') return res.status(403).json({ error: 'Only admins may edit the group' });
       const patch = {};
       if (req.body.name != null) { patch.name = clampStr(req.body.name, 80); patch.slug = slugify(req.body.name); }
@@ -240,7 +241,7 @@ export default async function handler(req, res) {
       if (req.body.cover_url !== undefined) patch.cover_url = req.body.cover_url || null;
       if (Array.isArray(req.body.tags)) patch.tags = toTags(req.body.tags);
       if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
-      const { data, error } = await supabase.from('groups').update(patch).eq('id', gid).select().single();
+      const { data, error } = await db.from('groups').update(patch).eq('id', gid).select().single();
       if (error) throw error;
       return res.status(200).json({ group: data });
     }
@@ -249,12 +250,12 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const gid = parseInt(req.body?.id, 10);
       if (!gid) return res.status(400).json({ error: 'id required' });
-      const { data: group } = await supabase.from('groups').select('owner_id, conversation_id').eq('id', gid).maybeSingle();
+      const { data: group } = await db.from('groups').select('owner_id, conversation_id').eq('id', gid).maybeSingle();
       if (!group) return res.status(404).json({ error: 'Group not found' });
       if (group.owner_id !== user.id) return res.status(403).json({ error: 'Only the owner may dissolve the group' });
-      await supabase.from('group_members').delete().eq('group_id', gid);
-      await supabase.from('group_posts').delete().eq('group_id', gid);
-      await supabase.from('groups').delete().eq('id', gid);
+      await db.from('group_members').delete().eq('group_id', gid);
+      await db.from('group_posts').delete().eq('group_id', gid);
+      await db.from('groups').delete().eq('id', gid);
       return res.status(200).json({ ok: true });
     }
 

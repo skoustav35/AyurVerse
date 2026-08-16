@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 import { chat, hasKey } from './opencode.js';
 
 /*
@@ -21,7 +21,7 @@ const toTags = (t) =>
     .slice(0, 8);
 
 async function loadProfile(userId, user) {
-  const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+  const { data: profile } = await db.from('profiles').select('*').eq('user_id', userId).maybeSingle();
   const fallbackName = user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : 'weaver');
   return {
     profile,
@@ -37,9 +37,9 @@ async function resolveUserId(idOrHandle) {
   const raw = String(idOrHandle).trim().replace(/^@/, '');
   // looks like a uuid / seed id → trust it
   if (/^[0-9a-f-]{16,}$/i.test(raw) || raw.startsWith('seed_') || raw.startsWith('fan_')) return raw;
-  const { data } = await supabase.from('profiles').select('user_id, username').ilike('username', raw).maybeSingle();
+  const { data } = await db.from('profiles').select('user_id, username').ilike('username', raw).maybeSingle();
   if (data) return data.user_id;
-  const { data: like } = await supabase.from('profiles').select('user_id').ilike('username', `%${raw}%`).limit(1).maybeSingle();
+  const { data: like } = await db.from('profiles').select('user_id').ilike('username', `%${raw}%`).limit(1).maybeSingle();
   return like?.user_id || null;
 }
 
@@ -48,7 +48,7 @@ async function resolveUserId(idOrHandle) {
 const TOOLS = {
   async get_my_profile({ userId, user }) {
     const { profile } = await loadProfile(userId, user);
-    const { count } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('followee_id', userId);
+    const { count } = await db.from('follows').select('*', { count: 'exact', head: true }).eq('followee_id', userId);
     return { result: { profile: profile || null, followers: count || 0 } };
   },
 
@@ -58,13 +58,13 @@ const TOOLS = {
     if (args.username != null) patch.username = String(args.username).trim().toLowerCase().replace(/[^a-z0-9._]+/g, '.').slice(0, 30);
     if (!Object.keys(patch).length) return { result: { error: 'nothing to update' } };
 
-    const { data: existing } = await supabase.from('profiles').select('user_id').eq('user_id', userId).maybeSingle();
+    const { data: existing } = await db.from('profiles').select('user_id').eq('user_id', userId).maybeSingle();
     let data, error;
     if (existing) {
-      ({ data, error } = await supabase.from('profiles').update(patch).eq('user_id', userId).select().single());
+      ({ data, error } = await db.from('profiles').update(patch).eq('user_id', userId).select().single());
     } else {
       const { fallbackName } = await loadProfile(userId, user);
-      ({ data, error } = await supabase.from('profiles').insert({
+      ({ data, error } = await db.from('profiles').insert({
         user_id: userId,
         username: patch.username || fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, '.').slice(0, 30),
         full_name: patch.full_name || fallbackName,
@@ -95,7 +95,7 @@ const TOOLS = {
       tags: toTags(args.tags),
       read_minutes: Math.max(1, Math.round(content_md.split(/\s+/).length / 190)),
     };
-    const { data, error } = await supabase.from('posts').insert(row).select().single();
+    const { data, error } = await db.from('posts').insert(row).select().single();
     if (error) return { result: { error: error.message } };
     return { result: { ok: true, id: data.id, title: data.title }, receipt: `Published lore \u201c${data.title}\u201d` };
   },
@@ -103,7 +103,7 @@ const TOOLS = {
   async edit_post({ userId, args }) {
     const id = parseInt(args.id, 10);
     if (!id) return { result: { error: 'post id required' } };
-    const { data: existing } = await supabase.from('posts').select('author_id, kind, title').eq('id', id).maybeSingle();
+    const { data: existing } = await db.from('posts').select('author_id, kind, title').eq('id', id).maybeSingle();
     if (!existing) return { result: { error: 'post not found' } };
     if (existing.author_id !== userId) return { result: { error: 'you can only edit your own posts' } };
     const patch = {};
@@ -114,7 +114,7 @@ const TOOLS = {
     if (args.location !== undefined) patch.location = args.location ? clampStr(args.location, 120) : null;
     if (args.tags != null) patch.tags = toTags(args.tags);
     if (!Object.keys(patch).length) return { result: { error: 'nothing to amend' } };
-    const { data, error } = await supabase.from('posts').update(patch).eq('id', id).select().single();
+    const { data, error } = await db.from('posts').update(patch).eq('id', id).select().single();
     if (error) return { result: { error: error.message } };
     return { result: { ok: true, id: data.id }, receipt: `Edited ${existing.kind === 'forge' ? 'lore' : 'post'} #${id}${existing.title ? ` \u201c${existing.title}\u201d` : ''}` };
   },
@@ -137,10 +137,10 @@ const TOOLS = {
   },
 
   async list_following({ userId }) {
-    const { data: fr } = await supabase.from('follows').select('followee_id').eq('follower_id', userId).limit(200);
+    const { data: fr } = await db.from('follows').select('followee_id').eq('follower_id', userId).limit(200);
     const ids = (fr || []).map((r) => r.followee_id);
     if (!ids.length) return { result: { following: [] } };
-    const { data: profs } = await supabase.from('profiles').select('user_id, username, full_name').in('user_id', ids);
+    const { data: profs } = await db.from('profiles').select('user_id, username, full_name').in('user_id', ids);
     const byId = new Map((profs || []).map((p) => [p.user_id, p]));
     return { result: { following: ids.map((id) => ({ user_id: id, username: byId.get(id)?.username || id, full_name: byId.get(id)?.full_name || null })) } };
   },
@@ -149,35 +149,35 @@ const TOOLS = {
     const target = await resolveUserId(args.user_id || args.username || args.handle);
     if (!target) return { result: { error: 'could not find that user' } };
     if (target === userId) return { result: { error: 'you cannot follow yourself' } };
-    const { data: existing } = await supabase.from('follows').select('id').eq('follower_id', userId).eq('followee_id', target).maybeSingle();
+    const { data: existing } = await db.from('follows').select('id').eq('follower_id', userId).eq('followee_id', target).maybeSingle();
     if (existing) return { result: { ok: true, already: true }, receipt: `Already following that channel` };
-    const { error } = await supabase.from('follows').insert({ follower_id: userId, followee_id: target });
+    const { error } = await db.from('follows').insert({ follower_id: userId, followee_id: target });
     if (error) return { result: { error: error.message } };
-    const { data: pr } = await supabase.from('profiles').select('username').eq('user_id', target).maybeSingle();
+    const { data: pr } = await db.from('profiles').select('username').eq('user_id', target).maybeSingle();
     return { result: { ok: true, followed: target }, receipt: `Followed @${pr?.username || target}` };
   },
 
   async unfollow_user({ userId, args }) {
     const target = await resolveUserId(args.user_id || args.username || args.handle);
     if (!target) return { result: { error: 'could not find that user' } };
-    const { error } = await supabase.from('follows').delete().eq('follower_id', userId).eq('followee_id', target);
+    const { error } = await db.from('follows').delete().eq('follower_id', userId).eq('followee_id', target);
     if (error) return { result: { error: error.message } };
-    const { data: pr } = await supabase.from('profiles').select('username').eq('user_id', target).maybeSingle();
+    const { data: pr } = await db.from('profiles').select('username').eq('user_id', target).maybeSingle();
     return { result: { ok: true, unfollowed: target }, receipt: `Unfollowed @${pr?.username || target}` };
   },
 
   async list_my_groups({ userId }) {
-    const { data: mem } = await supabase.from('group_members').select('group_id, role').eq('user_id', userId);
+    const { data: mem } = await db.from('group_members').select('group_id, role').eq('user_id', userId);
     const ids = (mem || []).map((m) => m.group_id);
     if (!ids.length) return { result: { groups: [] } };
-    const { data: groups } = await supabase.from('groups').select('id, name, kind, member_count').in('id', ids);
+    const { data: groups } = await db.from('groups').select('id, name, kind, member_count').in('id', ids);
     const roleById = new Map((mem || []).map((m) => [m.group_id, m.role]));
     return { result: { groups: (groups || []).map((g) => ({ id: g.id, name: g.name, kind: g.kind, members: g.member_count, role: roleById.get(g.id) })) } };
   },
 
   async find_groups({ args }) {
     const q = String(args.query || args.q || '').trim();
-    let query = supabase.from('groups').select('id, name, kind, description, member_count').limit(10);
+    let query = db.from('groups').select('id, name, kind, description, member_count').limit(10);
     if (q) query = query.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
     const { data } = await query;
     return { result: { groups: (data || []).map((g) => ({ id: g.id, name: g.name, kind: g.kind, members: g.member_count, about: g.description?.slice(0, 100) })) } };
@@ -189,9 +189,9 @@ const TOOLS = {
     if (!name) return { result: { error: 'a group needs a name' } };
     let conversation_id = null;
     if (kind === 'thread') {
-      const { data: conv } = await supabase.from('conversations').insert({ is_group: true, name, created_by: userId }).select().single();
+      const { data: conv } = await db.from('conversations').insert({ is_group: true, name, created_by: userId }).select().single();
       conversation_id = conv?.id ?? null;
-      if (conversation_id) await supabase.from('conversation_members').insert({ conversation_id, user_id: userId });
+      if (conversation_id) await db.from('conversation_members').insert({ conversation_id, user_id: userId });
     }
     const { data: group, error } = await supabase
       .from('groups')
@@ -199,38 +199,38 @@ const TOOLS = {
       .select()
       .single();
     if (error) return { result: { error: error.message } };
-    await supabase.from('group_members').insert({ group_id: group.id, user_id: userId, role: 'admin' });
+    await db.from('group_members').insert({ group_id: group.id, user_id: userId, role: 'admin' });
     return { result: { ok: true, id: group.id, name: group.name, kind: group.kind }, receipt: `Founded the ${group.kind} circle \u201c${group.name}\u201d` };
   },
 
   async join_group({ userId, user, args }) {
     let gid = parseInt(args.group_id, 10);
     if (!gid && args.name) {
-      const { data: g } = await supabase.from('groups').select('id').ilike('name', `%${String(args.name)}%`).limit(1).maybeSingle();
+      const { data: g } = await db.from('groups').select('id').ilike('name', `%${String(args.name)}%`).limit(1).maybeSingle();
       gid = g?.id;
     }
     if (!gid) return { result: { error: 'could not find that group' } };
-    const { data: group } = await supabase.from('groups').select('*').eq('id', gid).maybeSingle();
+    const { data: group } = await db.from('groups').select('*').eq('id', gid).maybeSingle();
     if (!group) return { result: { error: 'group not found' } };
-    const { data: exists } = await supabase.from('group_members').select('id').eq('group_id', gid).eq('user_id', userId).maybeSingle();
+    const { data: exists } = await db.from('group_members').select('id').eq('group_id', gid).eq('user_id', userId).maybeSingle();
     if (exists) return { result: { ok: true, already: true }, receipt: `Already in \u201c${group.name}\u201d` };
-    await supabase.from('group_members').insert({ group_id: gid, user_id: userId, role: 'member' });
+    await db.from('group_members').insert({ group_id: gid, user_id: userId, role: 'member' });
     if (group.kind === 'thread' && group.conversation_id) {
-      const { data: inConv } = await supabase.from('conversation_members').select('id').eq('conversation_id', group.conversation_id).eq('user_id', userId).maybeSingle();
-      if (!inConv) await supabase.from('conversation_members').insert({ conversation_id: group.conversation_id, user_id: userId });
+      const { data: inConv } = await db.from('conversation_members').select('id').eq('conversation_id', group.conversation_id).eq('user_id', userId).maybeSingle();
+      if (!inConv) await db.from('conversation_members').insert({ conversation_id: group.conversation_id, user_id: userId });
     }
-    const { count } = await supabase.from('group_members').select('*', { count: 'exact', head: true }).eq('group_id', gid);
-    await supabase.from('groups').update({ member_count: count || 0 }).eq('id', gid);
+    const { count } = await db.from('group_members').select('*', { count: 'exact', head: true }).eq('group_id', gid);
+    await db.from('groups').update({ member_count: count || 0 }).eq('id', gid);
     return { result: { ok: true, id: gid }, receipt: `Joined the circle \u201c${group.name}\u201d` };
   },
 
   async post_to_group({ userId, user, args }) {
     const gid = parseInt(args.group_id, 10);
     if (!gid) return { result: { error: 'group_id required' } };
-    const { data: group } = await supabase.from('groups').select('*').eq('id', gid).maybeSingle();
+    const { data: group } = await db.from('groups').select('*').eq('id', gid).maybeSingle();
     if (!group) return { result: { error: 'group not found' } };
     if (group.kind === 'thread') return { result: { error: 'thread circles take messages, not posts \u2014 use send_thread_message with its conversation' } };
-    const { data: mem } = await supabase.from('group_members').select('role').eq('group_id', gid).eq('user_id', userId).maybeSingle();
+    const { data: mem } = await db.from('group_members').select('role').eq('group_id', gid).eq('user_id', userId).maybeSingle();
     if (!mem) return { result: { error: 'join the group first' } };
     const meta = await loadProfile(userId, user);
     const kind = group.kind === 'forge' ? 'forge' : 'visual';
@@ -252,9 +252,9 @@ const TOOLS = {
       tags: toTags(args.tags),
       read_minutes: kind === 'forge' ? Math.max(1, Math.round((content_md || '').split(/\s+/).length / 190)) : null,
     };
-    const { data: post, error } = await supabase.from('posts').insert(row).select().single();
+    const { data: post, error } = await db.from('posts').insert(row).select().single();
     if (error) return { result: { error: error.message } };
-    await supabase.from('group_posts').insert({ group_id: gid, post_id: post.id, kind });
+    await db.from('group_posts').insert({ group_id: gid, post_id: post.id, kind });
     return { result: { ok: true, id: post.id }, receipt: `Posted to the circle \u201c${group.name}\u201d` };
   },
 
@@ -271,10 +271,10 @@ const TOOLS = {
   },
 
   async list_threads({ userId }) {
-    const { data: mem } = await supabase.from('conversation_members').select('conversation_id').eq('user_id', userId);
+    const { data: mem } = await db.from('conversation_members').select('conversation_id').eq('user_id', userId);
     const ids = (mem || []).map((m) => m.conversation_id);
     if (!ids.length) return { result: { threads: [] } };
-    const { data: convs } = await supabase.from('conversations').select('id, name, is_group, last_message_at').in('id', ids).order('last_message_at', { ascending: false });
+    const { data: convs } = await db.from('conversations').select('id, name, is_group, last_message_at').in('id', ids).order('last_message_at', { ascending: false });
     return { result: { threads: (convs || []).map((c) => ({ id: c.id, name: c.name, is_group: c.is_group })) } };
   },
 
@@ -293,22 +293,22 @@ const TOOLS = {
 
     if (!isGroup) {
       // reuse an existing 1:1
-      const { data: mine } = await supabase.from('conversation_members').select('conversation_id').eq('user_id', userId);
+      const { data: mine } = await db.from('conversation_members').select('conversation_id').eq('user_id', userId);
       const myIds = (mine || []).map((m) => m.conversation_id);
       if (myIds.length) {
-        const { data: convs } = await supabase.from('conversations').select('id').in('id', myIds).eq('is_group', false);
+        const { data: convs } = await db.from('conversations').select('id').in('id', myIds).eq('is_group', false);
         const plist = (convs || []).map((c) => c.id);
         if (plist.length) {
-          const { data: theirs } = await supabase.from('conversation_members').select('conversation_id').eq('user_id', uniq[0]).in('conversation_id', plist);
+          const { data: theirs } = await db.from('conversation_members').select('conversation_id').eq('user_id', uniq[0]).in('conversation_id', plist);
           if ((theirs || [])[0]) return { result: { ok: true, conversation_id: theirs[0].conversation_id, existing: true } };
         }
       }
     }
 
-    const { data: conv, error } = await supabase.from('conversations').insert({ is_group: isGroup, name, created_by: userId }).select().single();
+    const { data: conv, error } = await db.from('conversations').insert({ is_group: isGroup, name, created_by: userId }).select().single();
     if (error) return { result: { error: error.message } };
     const rows = [userId, ...uniq].map((uid) => ({ conversation_id: conv.id, user_id: uid }));
-    const { error: mErr } = await supabase.from('conversation_members').insert(rows);
+    const { error: mErr } = await db.from('conversation_members').insert(rows);
     if (mErr) return { result: { error: mErr.message } };
     return { result: { ok: true, conversation_id: conv.id }, receipt: `Started a ${isGroup ? 'group ' : ''}thread${name ? ` \u201c${name}\u201d` : ''}` };
   },
@@ -322,14 +322,14 @@ const TOOLS = {
     }
     const body = clampStr(args.body || args.message || args.text, 2200);
     if (!convId || !body) return { result: { error: 'conversation_id (or username) and body are required' } };
-    const { data: isMember } = await supabase.from('conversation_members').select('id').eq('conversation_id', convId).eq('user_id', userId).maybeSingle();
+    const { data: isMember } = await db.from('conversation_members').select('id').eq('conversation_id', convId).eq('user_id', userId).maybeSingle();
     if (!isMember) return { result: { error: 'you are not a member of that thread' } };
     const meta = await loadProfile(userId, user);
-    const { data, error } = await supabase.from('messages').insert({
+    const { data, error } = await db.from('messages').insert({
       conversation_id: convId, sender_id: userId, sender_name: meta.author_name, sender_avatar: meta.author_avatar, type: 'text', body,
     }).select().single();
     if (error) return { result: { error: error.message } };
-    await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', convId);
+    await db.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', convId);
     return { result: { ok: true, message_id: data.id, conversation_id: convId }, receipt: `Sent a message in thread #${convId}` };
   },
 };
@@ -436,7 +436,8 @@ function parseAction(text) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();

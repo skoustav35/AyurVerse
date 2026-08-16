@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { hueFor } from '../../lib/format';
 
 interface AvatarProps {
@@ -10,8 +11,11 @@ interface AvatarProps {
 export default function Avatar({ url, name, size = 40, className = '' }: AvatarProps) {
   const initial = (name || 'A').trim().charAt(0).toUpperCase();
   const hue = hueFor(name || 'ayur');
+  // A broken URL (expired host, CSP, dead link) must never paint the browser's
+  // torn-page glyph — fall back to the letter-mark, always.
+  const [broken, setBroken] = useState(false);
 
-  if (url) {
+  if (url && !broken) {
     return (
       <img
         src={url}
@@ -19,6 +23,7 @@ export default function Avatar({ url, name, size = 40, className = '' }: AvatarP
         width={size}
         height={size}
         loading="lazy"
+        onError={() => setBroken(true)}
         className={`rounded-full object-cover shrink-0 ${className}`}
         style={{ width: size, height: size }}
       />

@@ -15,6 +15,7 @@ import {
   usePost,
   useToggleLike,
   useToggleSave,
+  useMyProfile,
 } from '../../hooks/queries';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUI } from '../../store/ui';
@@ -22,6 +23,7 @@ import { sendSignal } from '../../lib/signals';
 
 function CommentsSection({ postId }: { postId: number }) {
   const { user } = useAuth();
+  const meProfile = useMyProfile().data;
   const { data: comments, isLoading } = useComments(postId);
   const addComment = useAddComment(postId);
   const deleteComment = useDeleteComment(postId);
@@ -49,7 +51,7 @@ function CommentsSection({ postId }: { postId: number }) {
       </h4>
 
       <div className="mt-4 flex items-start gap-3">
-        <Avatar url={user?.user_metadata?.avatar_url as string | undefined} name={user?.email ?? 'you'} size={34} />
+        <Avatar url={(meProfile?.avatar_url || user?.user_metadata?.avatar_url) as string | undefined} name={meProfile?.full_name || user?.email || 'you'} size={34} />
         <div className="flex-1">
           <textarea
             value={draft}

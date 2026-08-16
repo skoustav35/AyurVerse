@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const tokens = (q) => (q || '').toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
@@ -23,8 +23,8 @@ async function attachFlags(items, user) {
   if (!user || !items.length) return items;
   const ids = items.map((p) => p.id);
   const [{ data: likes }, { data: saves }] = await Promise.all([
-    supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
-    supabase.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
+    db.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
+    db.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
   ]);
   const likedSet = new Set((likes || []).map((l) => l.post_id));
   const savedSet = new Set((saves || []).map((s) => s.post_id));
@@ -36,7 +36,8 @@ async function attachFlags(items, user) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -44,12 +45,19 @@ export default async function handler(req, res) {
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+    // Edge caching: anonymous reads are shared across the CDN; authed reads
+    // carry personal flags (liked/saved), so they stay private and uncached.
+    res.setHeader(
+      'Cache-Control',
+      req.headers.authorization ? 'private, no-store' : 'public, s-maxage=15, stale-while-revalidate=30'
+    );
+
     const user = await getAuthUser(req);
     const kindFilter = req.query.kind === 'forge' ? 'forge' : null;
     const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
     const limit = clamp(parseInt(req.query.limit, 10) || 8, 1, 20);
 
-    let cq = supabase.from('posts').select('*').order('id', { ascending: false }).limit(400);
+    let cq = db.from('posts').select('*').order('id', { ascending: false }).limit(400);
     if (kindFilter) cq = cq.eq('kind', 'forge');
     const { data: posts, error } = await cq;
     if (error) throw error;
@@ -93,7 +101,7 @@ export default async function handler(req, res) {
 
     let followIds = [];
     if (user) {
-      const { data: fr } = await supabase.from('follows').select('followee_id').eq('follower_id', user.id);
+      const { data: fr } = await db.from('follows').select('followee_id').eq('follower_id', user.id);
       followIds = (fr || []).map((r) => r.followee_id);
     }
     const followedSet = new Set(followIds);
@@ -103,7 +111,7 @@ export default async function handler(req, res) {
     let boostedSet = new Set();
     let mutedSet = new Set();
     if (user) {
-      const { data: prefs } = await supabase.from('user_prefs').select('boosted_tags, muted_tags').eq('user_id', user.id).maybeSingle();
+      const { data: prefs } = await db.from('user_prefs').select('boosted_tags, muted_tags').eq('user_id', user.id).maybeSingle();
       boostedSet = new Set((prefs?.boosted_tags || []).map((t) => String(t).toLowerCase()));
       mutedSet = new Set((prefs?.muted_tags || []).map((t) => String(t).toLowerCase()));
     }

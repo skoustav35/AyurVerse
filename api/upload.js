@@ -1,7 +1,9 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
+import mediaBucket from './storage-client.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -18,9 +20,9 @@ export default async function handler(req, res) {
       const fileName0 = String(req.body.fileName || 'file');
       const safeName0 = fileName0.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-80);
       const path0 = `${user.id}/${Date.now()}-${safeName0}`;
-      const { data: signed, error: sErr } = await supabase.storage.from('media').createSignedUploadUrl(path0);
+      const { data: signed, error: sErr } = await mediaBucket.createSignedUploadUrl(path0);
       if (sErr) throw sErr;
-      const { data: pub } = supabase.storage.from('media').getPublicUrl(path0);
+      const { data: pub } = mediaBucket.getPublicUrl(path0);
       const signedUrl = (signed.signedUrl || '').replace(
         /^https:\/\/([^.]+)\.supabase\.(co|in|red)\/storage\/v1/,
         'https://$1.storage.supabase.$2/storage/v1',
@@ -38,12 +40,10 @@ export default async function handler(req, res) {
     const path = `${user.id}/${Date.now()}-${safeName}`;
     const buffer = Buffer.from(fileBase64, 'base64');
 
-    const { error } = await supabase.storage
-      .from('media')
-      .upload(path, buffer, { contentType: contentType || 'application/octet-stream', upsert: true });
+    const { error } = await mediaBucket.upload(path, buffer, { contentType: contentType || 'application/octet-stream', upsert: true });
     if (error) throw error;
 
-    const { data: urlData } = supabase.storage.from('media').getPublicUrl(path);
+    const { data: urlData } = mediaBucket.getPublicUrl(path);
     return res.status(200).json({ url: urlData.publicUrl });
   } catch (err) {
     console.error('upload error:', err);

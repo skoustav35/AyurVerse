@@ -1,5 +1,7 @@
-const PROJECT_REF = process.env.FULLSTACK_PROJECT_REF || '';
-const RESTORE_URL = process.env.FULLSTACK_RESTORE_API_URL || '';
+import { CENTRAL } from './env.js';
+
+const PROJECT_REF = CENTRAL.PROJECT_REF;
+const RESTORE_URL = CENTRAL.RESTORE_API_URL;
 
 let _restoreTriggered = false;
 

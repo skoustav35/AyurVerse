@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 import { chat, hasKey } from './opencode.js';
 
 /*
@@ -43,7 +43,8 @@ function localScribe(mode, text, title) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();

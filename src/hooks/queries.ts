@@ -277,11 +277,23 @@ export function useUnreadThreadCount() {
   return (data ?? []).reduce((acc, t) => acc + t.unread_count, 0);
 }
 
+/** The signed-in weaver's profile row — the source of truth for their card.
+ *  Auth metadata (Google photos etc.) is only a starting value; edits flow
+ *  through /api/profiles and this cache. */
+export function useMyProfile() {
+  return useQuery({
+    queryKey: ['me-profile'],
+    queryFn: () => apiFetch<Profile | null>('/api/profiles?user_id=me'),
+    staleTime: 30_000,
+  });
+}
+
 export function useMessages(conversationId: number | null) {
   return useQuery({
     queryKey: ['messages', conversationId],
     enabled: conversationId !== null,
-    queryFn: () => apiFetch<ChatMessage[]>(`/api/messages?conversation_id=${conversationId}`),
+    queryFn: () =>
+      apiFetch<{ items: ChatMessage[]; has_more?: boolean }>(`/api/messages?conversation_id=${conversationId}`),
   });
 }
 
@@ -300,8 +312,8 @@ export function useSendMessage(conversationId: number) {
         body: JSON.stringify({ conversation_id: conversationId, ...payload }),
       }),
     onSuccess: (m) => {
-      queryClient.setQueryData<ChatMessage[]>(['messages', conversationId], (old) =>
-        old ? [...old, m] : [m],
+      queryClient.setQueryData<{ items: ChatMessage[]; has_more?: boolean }>(['messages', conversationId], (old) =>
+        old ? { ...old, items: [...old.items, m] } : { items: [m], has_more: false },
       );
       queryClient.invalidateQueries({ queryKey: ['threads'] });
     },

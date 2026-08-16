@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 async function getAuthUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -8,7 +8,8 @@ async function getAuthUser(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
 
       let followeeIds = [];
       if (user) {
-        const { data: fr } = await supabase.from('follows').select('followee_id, id').eq('follower_id', user.id).order('id', { ascending: false });
+        const { data: fr } = await db.from('follows').select('followee_id, id').eq('follower_id', user.id).order('id', { ascending: false });
         followeeIds = (fr || []).map((r) => r.followee_id);
       }
       const followSet = new Set(followeeIds);
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
       }
 
       const { data: profs } = followeeIds.length
-        ? await supabase.from('profiles').select('user_id, username, full_name, avatar_url').in('user_id', followeeIds)
+        ? await db.from('profiles').select('user_id, username, full_name, avatar_url').in('user_id', followeeIds)
         : { data: [] };
       const profileById = new Map((profs || []).map((p) => [p.user_id, p]));
 
@@ -86,7 +87,7 @@ export default async function handler(req, res) {
       const mediaUrl = String(req.body?.media_url || '');
       if (!mediaUrl) return res.status(400).json({ error: 'media_url required' });
 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+      const { data: profile } = await db.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
       const fallbackName = user.user_metadata?.full_name || (user.email ? user.email.split('@')[0] : 'weaver');
 
       const row = {
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
         media_type: req.body?.media_type === 'video' ? 'video' : 'image',
         caption: req.body?.caption ? String(req.body.caption).slice(0, 160) : null,
       };
-      const { data, error } = await supabase.from('statuses').insert(row).select().single();
+      const { data, error } = await db.from('statuses').insert(row).select().single();
       if (error) throw error;
       return res.status(201).json(data);
     }
@@ -107,10 +108,10 @@ export default async function handler(req, res) {
       if (!user) return res.status(401).json({ error: 'Sign in required' });
       const id = parseInt(req.body?.id, 10);
       if (!id) return res.status(400).json({ error: 'id required' });
-      const { data: existing } = await supabase.from('statuses').select('user_id').eq('id', id).maybeSingle();
+      const { data: existing } = await db.from('statuses').select('user_id').eq('id', id).maybeSingle();
       if (!existing) return res.status(404).json({ error: 'Status not found' });
       if (existing.user_id !== user.id) return res.status(403).json({ error: 'Not your status' });
-      const { error } = await supabase.from('statuses').delete().eq('id', id);
+      const { error } = await db.from('statuses').delete().eq('id', id);
       if (error) throw error;
       return res.status(200).json({ ok: true });
     }

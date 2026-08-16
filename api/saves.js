@@ -1,7 +1,8 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
       const ids = (rows || []).map((r) => r.post_id);
       if (req.query.full !== '1') return res.status(200).json({ ids });
       if (!ids.length) return res.status(200).json({ items: [] });
-      const { data: posts, error: pErr } = await supabase.from('posts').select('*').in('id', ids);
+      const { data: posts, error: pErr } = await db.from('posts').select('*').in('id', ids);
       if (pErr) throw pErr;
       const byId = new Map(posts.map((p) => [p.id, p]));
       const items = ids.map((pid) => byId.get(pid)).filter(Boolean).map((p) => ({ ...p, saved: true }));
@@ -35,18 +36,18 @@ export default async function handler(req, res) {
 
       let saved;
       if (existing) {
-        const { error } = await supabase.from('saves').delete().eq('id', existing.id);
+        const { error } = await db.from('saves').delete().eq('id', existing.id);
         if (error) throw error;
         saved = false;
       } else {
-        const { error } = await supabase.from('saves').insert({ post_id: postId, user_id: user.id });
+        const { error } = await db.from('saves').insert({ post_id: postId, user_id: user.id });
         if (error) throw error;
         saved = true;
       }
 
-      const { data: post } = await supabase.from('posts').select('saves_count, tags, kind').eq('id', postId).single();
+      const { data: post } = await db.from('posts').select('saves_count, tags, kind').eq('id', postId).single();
       const next = Math.max(0, (post?.saves_count ?? 0) + (saved ? 1 : -1));
-      await supabase.from('posts').update({ saves_count: next }).eq('id', postId);
+      await db.from('posts').update({ saves_count: next }).eq('id', postId);
       if (saved) {
         await supabase
           .from('signals')

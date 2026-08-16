@@ -52,6 +52,11 @@ interface UIState {
   setComposerOpen: (open: boolean) => void;
   composerGroupId: number | null;
   setComposerGroup: (id: number | null) => void;
+  /** Vaidya — the on-call sage, summonable from any tab on any device */
+  vaidyaOpen: boolean;
+  openVaidya: () => void;
+  closeVaidya: () => void;
+  toggleVaidya: () => void;
   toasts: Toast[];
   pushToast: (message: string, tone?: Toast['tone']) => void;
   dismissToast: (id: number) => void;
@@ -124,6 +129,10 @@ export const useUI = create<UIState>()((set, get) => ({
   setComposerOpen: (open) => set({ composerOpen: open, ...(open ? {} : { composerGroupId: null }) }),
   composerGroupId: null,
   setComposerGroup: (id) => set({ composerGroupId: id }),
+  vaidyaOpen: false,
+  openVaidya: () => set({ vaidyaOpen: true }),
+  closeVaidya: () => set({ vaidyaOpen: false }),
+  toggleVaidya: () => set((s) => ({ vaidyaOpen: !s.vaidyaOpen })),
   toasts: [],
   pushToast: (message, tone = 'gold') => {
     const id = toastSeq++;

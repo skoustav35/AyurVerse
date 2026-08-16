@@ -19,6 +19,24 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [magicSent, setMagicSent] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleUrl, setGoogleUrl] = useState<string | null>(null);
+
+  const startGoogle = async () => {
+    setGoogleUrl(null);
+    setError(null);
+    setGoogleBusy(true);
+    try {
+      const r = await signInWithGoogle('AyurVerse');
+      if (!r.ok && r.reason === 'blocked' && r.url) {
+        setGoogleUrl(r.url);
+      } else if (!r.ok) {
+        setError('Google sign-in is not configured on this build — email or the demo account will carry you in.');
+      }
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
 
   const reset = () => {
     setError(null);
@@ -179,8 +197,9 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
               </div>
 
               <button
-                onClick={() => signInWithGoogle('AyurVerse')}
-                className="w-full rounded-xl border border-sand-300 bg-parchment/70 font-medium text-sm py-2.5 hover:bg-sand-100 transition-colors inline-flex items-center justify-center gap-2.5 text-ink-800"
+                onClick={startGoogle}
+                disabled={googleBusy}
+                className="w-full rounded-xl border border-sand-300 bg-parchment/70 font-medium text-sm py-2.5 hover:bg-sand-100 transition-colors inline-flex items-center justify-center gap-2.5 text-ink-800 disabled:opacity-60"
               >
                 <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
                   <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.09 3.57-5.16 3.57-8.81z" />
@@ -188,8 +207,32 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                   <path fill="#FBBC05" d="M5.28 14.27A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.38-2.27V6.62H1.28a12 12 0 0 0 0 10.76l4-3.11z" />
                   <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.61 4.58 1.8l3.44-3.44A11.98 11.98 0 0 0 12 0 12 12 0 0 0 1.28 6.62l4 3.11c.94-2.85 3.59-4.96 6.72-4.96z" />
                 </svg>
-                Continue with Google
+                {googleBusy ? 'Opening Google…' : 'Continue with Google'}
               </button>
+
+              <AnimatePresence>
+                {googleUrl && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="mt-3 rounded-xl border border-gold-400/50 bg-gold-500/10 px-4 py-3"
+                  >
+                    <p className="text-[12.5px] text-ink-700 leading-relaxed">
+                      Your browser held the popup shut. Continue in a fresh tab — the atelier
+                      receives you signed-in.
+                    </p>
+                    <a
+                      href={googleUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-neem-800 px-3.5 py-2 text-[12px] font-semibold text-parchment hover:bg-neem-900 transition-colors"
+                    >
+                      Open Google sign-in in a new tab
+                    </a>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <p className="text-center text-[12.5px] text-ink-500 mt-4">
                 {mode === 'signin' ? 'New to the atelier?' : 'Already a weaver?'}{' '}

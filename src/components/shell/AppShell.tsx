@@ -45,32 +45,47 @@ export default function AppShell() {
   }, [openReader]);
 
   // Live engagement: any like/save/comment count changes propagate into caches
+  // Live engagement: like/save/comment counts fan out from postgres_changes.
+  // Under real load that channel fires in bursts — so events are buffered and
+  // the query cache is rewritten at most once every 220ms, never per-row.
   useEffect(() => {
-    const channel = supabase
-      .channel('posts-live')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
-        const row = payload.new as Post;
-        for (const key of ['posts', 'feed']) {
-          queryClient.setQueriesData<InfiniteData<FeedPage>>({ queryKey: [key] }, (old) => {
-            if (!old || !('pages' in old)) return old;
-            return {
-              ...old,
-              pages: old.pages.map((pg) => ({
-                ...pg,
-                items: pg.items.map((p) =>
-                  p.id === row.id
-                    ? {
-                        ...p,
-                        likes_count: row.likes_count,
-                        saves_count: row.saves_count,
-                        comments_count: row.comments_count,
-                      }
-                    : p,
-                ),
-              })),
-            };
+    const pending = new Map<number, Post>();
+    let flushTimer: number | undefined;
+
+    const flush = () => {
+      flushTimer = undefined;
+      if (!pending.size) return;
+      const rows = new Map(pending);
+      pending.clear();
+
+      const countsOf = (p: Post) => {
+        const hit = rows.get(p.id);
+        return hit
+          ? { likes_count: hit.likes_count, saves_count: hit.saves_count, comments_count: hit.comments_count }
+          : null;
+      };
+
+      for (const key of ['posts', 'feed']) {
+        queryClient.setQueriesData<InfiniteData<FeedPage>>({ queryKey: [key] }, (old) => {
+          if (!old || !('pages' in old)) return old;
+          let touched = false;
+          const pages = old.pages.map((pg) => {
+            let pt = false;
+            const items = pg.items.map((p) => {
+              const c = countsOf(p);
+              if (c) {
+                pt = true;
+                return { ...p, ...c };
+              }
+              return p;
+            });
+            if (pt) touched = true;
+            return pt ? { ...pg, items } : pg;
           });
-        }
+          return touched ? { ...old, pages } : old;
+        });
+      }
+      for (const row of rows.values()) {
         queryClient.setQueryData<Post>(['post', row.id], (old) =>
           old
             ? {
@@ -81,10 +96,20 @@ export default function AppShell() {
               }
             : old,
         );
+      }
+    };
+
+    const channel = supabase
+      .channel('posts-live')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+        const row = payload.new as Post;
+        pending.set(row.id, row);
+        if (!flushTimer) flushTimer = window.setTimeout(flush, 220);
       })
       .subscribe();
 
     return () => {
+      if (flushTimer) window.clearTimeout(flushTimer);
       supabase.removeChannel(channel);
     };
   }, [queryClient]);

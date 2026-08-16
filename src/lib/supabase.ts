@@ -1,14 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
+import { ENV } from './env';
 
-const url =
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
-  (import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined) ||
-  '';
-const anonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
-  (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
-  '';
-
-const supabase = createClient(url, anonKey);
+const supabase = createClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY, {
+  auth: {
+    flowType: 'pkce',
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 export default supabase;

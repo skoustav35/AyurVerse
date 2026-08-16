@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bookmark, CalendarDays, Camera, LogOut, PencilLine, Sprout, Users, Wand2, Wallet, Sparkles, X, Rocket } from 'lucide-react';
+import { Bookmark, CalendarDays, Camera, LogOut, PencilLine, Sprout, Users, Wand2, Wallet, Sparkles, X, Rocket, Radar } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '../common/Avatar';
 import Mandala from '../common/Mandala';
@@ -11,6 +11,7 @@ import AiChat from '../ai/AiChat';
 import AnalyticsView from '../studio/AnalyticsView';
 import BoostView from '../studio/BoostView';
 import PayoutsView from '../studio/PayoutsView';
+import SocietyView from '../studio/SocietyView';
 import supabase from '../../lib/supabase';
 import { apiFetch } from '../../lib/api';
 import { uploadMedia } from '../../lib/upload';
@@ -58,6 +59,10 @@ function EditProfileModal({ profile, onClose }: { profile: Profile; onClose: () 
         method: 'POST',
         body: JSON.stringify({ full_name: fullName.trim(), username: username.trim(), bio: bio.trim(), avatar_url: avatarUrl || null }),
       });
+      // keep Supabase auth metadata in step — legacy readers still peek at it
+      try {
+        await supabase.auth.updateUser({ data: { avatar_url: avatarUrl || null, full_name: fullName.trim() } });
+      } catch { /* metadata sync is best-effort; the profile row already won */ }
       await queryClient.invalidateQueries({ queryKey: ['me-profile'] });
       pushToast('Your card in the atelier has been re-inked', 'neem');
       onClose();
@@ -139,7 +144,7 @@ function EditProfileModal({ profile, onClose }: { profile: Profile; onClose: () 
   );
 }
 
-type StudioSub = 'analytics' | 'boost' | 'payouts';
+type StudioSub = 'analytics' | 'boost' | 'payouts' | 'society';
 
 export default function ProfileView() {
   const { user } = useAuth();
@@ -422,6 +427,7 @@ function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: Stu
     { id: 'analytics', label: 'Analytics', icon: Wand2 },
     { id: 'boost', label: 'Boost', icon: Rocket },
     { id: 'payouts', label: 'Payouts', icon: Wallet },
+    { id: 'society', label: 'Society', icon: Radar },
   ];
   return (
     <div className="mt-5">
@@ -445,6 +451,7 @@ function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: Stu
       {active === 'analytics' && <AnalyticsView />}
       {active === 'boost' && <BoostView />}
       {active === 'payouts' && <PayoutsView />}
+      {active === 'society' && <SocietyView />}
     </div>
   );
 }

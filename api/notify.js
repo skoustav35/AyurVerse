@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 /*
  * Record a notification for `recipientId` caused by `actor` (a Supabase user).
@@ -14,7 +14,7 @@ export async function notify({ recipientId, actor, type, postId = null, conversa
       .eq('user_id', actor.id)
       .maybeSingle();
     const fallback = actor.user_metadata?.full_name || (actor.email ? actor.email.split('@')[0] : 'weaver');
-    await supabase.from('notifications').insert({
+    await db.from('notifications').insert({
       user_id: recipientId,
       actor_id: actor.id,
       actor_name: profile?.full_name || fallback,

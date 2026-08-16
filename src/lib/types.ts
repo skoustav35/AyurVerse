@@ -63,6 +63,10 @@ export interface ChatMessage {
   reactions: { e: string; u: string }[];
   created_at: string;
   post?: Post | null;
+  /** client-only: optimistic bubble still travelling to the loom */
+  pending?: boolean;
+  /** client-only: send failed; tap to retry */
+  failed?: boolean;
 }
 
 export interface FeedPage {

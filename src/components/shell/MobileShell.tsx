@@ -1,16 +1,29 @@
+import { lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Send, Bell, UsersRound } from 'lucide-react';
+import { Plus, Send, Bell, UsersRound, Sparkles, X } from 'lucide-react';
 import BottomNav from './BottomNav';
 import FeedView from '../feed/FeedView';
-import ReelsView from '../reels/ReelsView';
-import SearchView from '../search/SearchView';
-import ProfileView from '../profile/ProfileView';
 import UserProfileOverlay from '../profile/UserProfile';
 import ReaderSheet from '../reader/ReaderSheet';
 import Composer from '../composer/Composer';
-import ThreadsScreen from '../threads/ThreadsScreen';
 import ShareTray from '../threads/ShareTray';
 import { LotusMark } from '../common/Mandala';
+
+const ReelsView = lazy(() => import('../reels/ReelsView'));
+const SearchView = lazy(() => import('../search/SearchView'));
+const ThreadsScreen = lazy(() => import('../threads/ThreadsScreen'));
+const ProfileView = lazy(() => import('../profile/ProfileView'));
+const AiChat = lazy(() => import('../ai/AiChat'));
+
+function ViewFallback() {
+  return (
+    <div className="grid place-items-center py-24">
+      <div className="text-gold-500 animate-pulse">
+        <LotusMark className="w-9 h-9" />
+      </div>
+    </div>
+  );
+}
 import { useUnreadThreadCount, useNotifications } from '../../hooks/queries';
 import { useUI } from '../../store/ui';
 
@@ -26,6 +39,7 @@ export default function MobileShell() {
   const unread = useUnreadThreadCount();
   const { data: notif } = useNotifications();
   const unreadNotif = notif?.unread ?? 0;
+  const vaidyaOpen = useUI((s) => s.vaidyaOpen);
 
   return (
     <div className="flex flex-col overflow-hidden bg-parchment" style={{ height: 'var(--vvh, 100%)' }}>
@@ -39,6 +53,14 @@ export default function MobileShell() {
           </span>
         </button>
         <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => useUI.getState().toggleVaidya()}
+            className="p-2 rounded-full text-gold-600 hover:bg-gold-400/15 transition-colors"
+            aria-label="Ask Vaidya"
+            title="Ask Vaidya"
+          >
+            <Sparkles size={19} />
+          </button>
           <button
             onClick={openCirclesDrawer}
             className="p-2 rounded-full text-ink-700 hover:bg-sand-200/70 transition-colors"
@@ -83,11 +105,27 @@ export default function MobileShell() {
             transition={{ duration: 0.18 }}
           >
             {tab === 'feed' && <FeedView />}
-            {tab === 'reels' && <ReelsView />}
+            {tab === 'reels' && (
+              <Suspense fallback={<ViewFallback />}>
+                <ReelsView />
+              </Suspense>
+            )}
             {tab === 'forge' && <FeedView kind="forge" />}
-            {tab === 'search' && <SearchView />}
-            {tab === 'threads' && <ThreadsScreen />}
-            {tab === 'profile' && <ProfileView />}
+            {tab === 'search' && (
+              <Suspense fallback={<ViewFallback />}>
+                <SearchView />
+              </Suspense>
+            )}
+            {tab === 'threads' && (
+              <Suspense fallback={<ViewFallback />}>
+                <ThreadsScreen />
+              </Suspense>
+            )}
+            {tab === 'profile' && (
+              <Suspense fallback={<ViewFallback />}>
+                <ProfileView />
+              </Suspense>
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -122,6 +160,48 @@ export default function MobileShell() {
       <UserProfileOverlay />
       <ShareTray />
       <Composer />
+
+      {/* Vaidya — the sage rises as a full sheet, summonable from any tab */}
+      <AnimatePresence>
+        {useUI((s) => s.vaidyaOpen) && (
+          <motion.div
+            key="vaidya-sheet"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            className="fixed inset-0 z-[80] bg-parchment flex flex-col"
+          >
+            <VaidyaSheetBody />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function VaidyaSheetBody() {
+  const closeVaidya = useUI((s) => s.closeVaidya);
+  return (
+    <>
+      <button
+        onClick={closeVaidya}
+        className="absolute top-3.5 right-3.5 z-50 grid place-items-center w-9 h-9 rounded-full bg-sand-200/80 text-ink-600 hover:bg-sand-300"
+        aria-label="Close Vaidya"
+      >
+        <X size={16} />
+      </button>
+      <Suspense
+        fallback={
+          <div className="flex-1 grid place-items-center">
+            <span className="text-gold-500 animate-pulse">
+              <LotusMark className="w-9 h-9" />
+            </span>
+          </div>
+        }
+      >
+        <AiChat onClose={closeVaidya} />
+      </Suspense>
+    </>
   );
 }

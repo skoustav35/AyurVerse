@@ -1,9 +1,9 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 async function computeEarned(userId) {
-  const { data: posts } = await supabase.from('posts').select('likes_count').eq('author_id', userId).limit(500);
+  const { data: posts } = await db.from('posts').select('likes_count').eq('author_id', userId).limit(500);
   const likesPool = (posts || []).reduce((a, p) => a + (p.likes_count || 0), 0);
-  const { data: followers } = await supabase.from('follows').select('id').eq('followee_id', userId).limit(6000);
+  const { data: followers } = await db.from('follows').select('id').eq('followee_id', userId).limit(6000);
   const followerCount = (followers || []).length;
   const eligible = followerCount >= 1000;
   const earnedCents = eligible ? Math.floor(likesPool / 1000) * 100 : 0;
@@ -11,7 +11,8 @@ async function computeEarned(userId) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -49,7 +50,7 @@ export default async function handler(req, res) {
       if (standing.likesPool < 1000)
         return res.status(400).json({ error: 'Your pool lacks 1,000 likes \u2014 the pot fills as hearts land.' });
 
-      const { data: rows } = await supabase.from('payout_requests').select('amount_cents').eq('user_id', user.id);
+      const { data: rows } = await db.from('payout_requests').select('amount_cents').eq('user_id', user.id);
       const alreadyRequested = (rows || []).reduce((a, r) => a + r.amount_cents, 0);
       const withdrawable = Math.max(0, standing.earnedCents - alreadyRequested);
       if (withdrawable < 100) return res.status(400).json({ error: 'Nothing withdrawable yet \u2014 the pool is still filling.' });

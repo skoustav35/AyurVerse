@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 import { notifyMany } from './notify.js';
 
 const TYPES = new Set(['text', 'image', 'voice', 'sticker', 'post']);
@@ -35,7 +35,8 @@ async function attachSharedPosts(messages) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -49,16 +50,24 @@ export default async function handler(req, res) {
       if (!convId) return res.status(400).json({ error: 'conversation_id required' });
       if (!(await requireMember(convId, user.id))) return res.status(403).json({ error: 'Not your thread' });
 
-      const { data, error } = await supabase
+      // paginated backscroll: newest page first, walk back with ?before=<oldest id>
+      const before = parseInt(req.query.before, 10) || null;
+      const limit = Math.min(60, Math.max(10, parseInt(req.query.limit, 10) || 40));
+      let q = supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', convId)
         .order('id', { ascending: false })
-        .limit(300);
+        .limit(limit + 1);
+      if (before) q = q.lt('id', before);
+      const { data, error } = await q;
       if (error) throw error;
-      const asc = (data || []).reverse();
-      await attachSharedPosts(asc);
-      return res.status(200).json(asc);
+      const rows = data || [];
+      const hasMore = rows.length > limit;
+      const page = rows.slice(0, limit).reverse();
+      await attachSharedPosts(page);
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).json({ items: page, has_more: hasMore });
     }
 
     if (req.method === 'POST') {
@@ -72,7 +81,7 @@ export default async function handler(req, res) {
       if (type === 'post' && !req.body?.post_id) return res.status(400).json({ error: 'post_id required' });
       if (!(await requireMember(convId, user.id))) return res.status(403).json({ error: 'Not your thread' });
 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+      const { data: profile } = await db.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
       const fallbackName = user.user_metadata?.full_name || (user.email ? user.email.split('@')[0] : 'weaver');
 
       const row = {
@@ -85,9 +94,9 @@ export default async function handler(req, res) {
         media_url: type === 'image' || type === 'voice' ? String(req.body.media_url) : null,
         post_id: type === 'post' ? parseInt(req.body.post_id, 10) : null,
       };
-      const { data, error } = await supabase.from('messages').insert(row).select().single();
+      const { data, error } = await db.from('messages').insert(row).select().single();
       if (error) throw error;
-      await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', convId);
+      await db.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', convId);
 
       // notify the other members of the thread
       const { data: members } = await supabase
@@ -114,7 +123,7 @@ export default async function handler(req, res) {
       const emoji = String(req.body?.emoji || '').slice(0, 6);
       if (!messageId || !emoji) return res.status(400).json({ error: 'message_id and emoji required' });
 
-      const { data: msg } = await supabase.from('messages').select('*').eq('id', messageId).maybeSingle();
+      const { data: msg } = await db.from('messages').select('*').eq('id', messageId).maybeSingle();
       if (!msg) return res.status(404).json({ error: 'Message not found' });
       if (!(await requireMember(msg.conversation_id, user.id))) return res.status(403).json({ error: 'Not your thread' });
 
@@ -137,11 +146,11 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const id = parseInt(req.body?.id, 10);
       if (!id) return res.status(400).json({ error: 'id required' });
-      const { data: msg } = await supabase.from('messages').select('sender_id, conversation_id').eq('id', id).maybeSingle();
+      const { data: msg } = await db.from('messages').select('sender_id, conversation_id').eq('id', id).maybeSingle();
       if (!msg) return res.status(404).json({ error: 'Message not found' });
       if (msg.sender_id !== user.id) return res.status(403).json({ error: 'Only your own words can be unsent' });
       if (!(await requireMember(msg.conversation_id, user.id))) return res.status(403).json({ error: 'Not your thread' });
-      const { error } = await supabase.from('messages').delete().eq('id', id);
+      const { error } = await db.from('messages').delete().eq('id', id);
       if (error) throw error;
       return res.status(200).json({ ok: true });
     }

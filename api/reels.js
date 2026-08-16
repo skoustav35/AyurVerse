@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 /*
  * Reels deck — server-side video feed.
@@ -16,7 +16,8 @@ async function getAuthUser(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -54,8 +55,8 @@ export default async function handler(req, res) {
     if (user && scored.length) {
       const ids = scored.map((p) => p.id);
       const [{ data: likes }, { data: saves }] = await Promise.all([
-        supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
-        supabase.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
+        db.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
+        db.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
       ]);
       const likedSet = new Set((likes || []).map((l) => l.post_id));
       const savedSet = new Set((saves || []).map((s) => s.post_id));

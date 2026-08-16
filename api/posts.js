@@ -1,4 +1,5 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
+import mediaBucket from './storage-client.js';
 
 const DEFAULT_PAGE = 8;
 
@@ -13,8 +14,8 @@ async function attachFlags(items, user) {
   if (!user || !items.length) return items;
   const ids = items.map((p) => p.id);
   const [{ data: likes }, { data: saves }] = await Promise.all([
-    supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
-    supabase.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
+    db.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
+    db.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
   ]);
   const likedSet = new Set((likes || []).map((l) => l.post_id));
   const savedSet = new Set((saves || []).map((s) => s.post_id));
@@ -26,7 +27,8 @@ async function attachFlags(items, user) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -39,14 +41,14 @@ export default async function handler(req, res) {
       const lim = Math.min(parseInt(limit, 10) || DEFAULT_PAGE, 30);
 
       if (id) {
-        const { data, error } = await supabase.from('posts').select('*').eq('id', parseInt(id, 10)).maybeSingle();
+        const { data, error } = await db.from('posts').select('*').eq('id', parseInt(id, 10)).maybeSingle();
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Post not found' });
         await attachFlags([data], user);
         return res.status(200).json(data);
       }
 
-      let q = supabase.from('posts').select('*');
+      let q = db.from('posts').select('*');
       if (kind) q = q.eq('kind', kind);
       if (author) q = q.eq('author_id', author);
       if (sort === 'top') {
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
       if (kind === 'visual' && !body.media_url) return res.status(400).json({ error: 'A visual post needs media' });
       if (kind === 'forge' && (!body.title || !body.content_md)) return res.status(400).json({ error: 'An article needs a title and body' });
 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+      const { data: profile } = await db.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
       const fallbackName = user.user_metadata?.full_name || (user.email ? user.email.split('@')[0] : 'weaver');
       const author_name = profile?.full_name || fallbackName;
       const author_username = profile?.username || fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, '.');
@@ -101,7 +103,7 @@ export default async function handler(req, res) {
         read_minutes: kind === 'forge' ? Math.max(1, Math.round(String(body.content_md || '').split(/\s+/).length / 190)) : null,
       };
 
-      const { data, error } = await supabase.from('posts').insert(row).select().single();
+      const { data, error } = await db.from('posts').insert(row).select().single();
       if (error) throw error;
       data.liked = false;
       data.saved = false;
@@ -112,7 +114,7 @@ export default async function handler(req, res) {
       if (!user) return res.status(401).json({ error: 'Sign in to edit' });
       const id = parseInt(req.body?.id, 10);
       if (!id) return res.status(400).json({ error: 'id required' });
-      const { data: existing } = await supabase.from('posts').select('author_id').eq('id', id).maybeSingle();
+      const { data: existing } = await db.from('posts').select('author_id').eq('id', id).maybeSingle();
       if (!existing) return res.status(404).json({ error: 'Post not found' });
       if (existing.author_id !== user.id) return res.status(403).json({ error: 'Only the weaver may amend this' });
 
@@ -125,7 +127,7 @@ export default async function handler(req, res) {
         patch.tags = req.body.tags.map((t) => String(t).trim().toLowerCase().replace(/^#/, '')).filter(Boolean).slice(0, 8);
       if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to amend' });
 
-      const { data, error } = await supabase.from('posts').update(patch).eq('id', id).select().single();
+      const { data, error } = await db.from('posts').update(patch).eq('id', id).select().single();
       if (error) throw error;
       return res.status(200).json(data);
     }
@@ -134,19 +136,19 @@ export default async function handler(req, res) {
       if (!user) return res.status(401).json({ error: 'Sign in to delete' });
       const id = parseInt(req.body?.id, 10);
       if (!id) return res.status(400).json({ error: 'id required' });
-      const { data: existing } = await supabase.from('posts').select('author_id, media_url').eq('id', id).maybeSingle();
+      const { data: existing } = await db.from('posts').select('author_id, media_url').eq('id', id).maybeSingle();
       if (!existing) return res.status(404).json({ error: 'Post not found' });
       if (existing.author_id !== user.id) return res.status(403).json({ error: 'Only the weaver may burn this' });
 
-      await supabase.from('comments').delete().eq('post_id', id);
-      await supabase.from('likes').delete().eq('post_id', id);
-      await supabase.from('saves').delete().eq('post_id', id);
-      const { error } = await supabase.from('posts').delete().eq('id', id);
+      await db.from('comments').delete().eq('post_id', id);
+      await db.from('likes').delete().eq('post_id', id);
+      await db.from('saves').delete().eq('post_id', id);
+      const { error } = await db.from('posts').delete().eq('id', id);
       if (error) throw error;
 
       if (existing.media_url) {
         const m = String(existing.media_url).match(/\/object\/public\/media\/(.+)$/);
-        if (m) supabase.storage.from('media').remove([decodeURIComponent(m[1])]).then(() => {});
+        if (m) mediaBucket.remove([decodeURIComponent(m[1])]).then(() => {}).catch(() => {});
       }
       return res.status(200).json({ ok: true });
     }

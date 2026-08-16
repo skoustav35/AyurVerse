@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 async function getAuthUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -8,7 +8,8 @@ async function getAuthUser(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -28,19 +29,19 @@ export default async function handler(req, res) {
       if (!convIds.length) return res.status(200).json([]);
 
       const [{ data: convs }, { data: allMembers }, { data: msgs }] = await Promise.all([
-        supabase.from('conversations').select('*').in('id', convIds).order('last_message_at', { ascending: false }),
-        supabase.from('conversation_members').select('conversation_id, user_id, last_read_at').in('conversation_id', convIds),
+        db.from('conversations').select('*').in('id', convIds).order('last_message_at', { ascending: false }),
+        db.from('conversation_members').select('conversation_id, user_id, last_read_at').in('conversation_id', convIds),
         supabase
           .from('messages')
           .select('id, conversation_id, sender_id, sender_name, body, type, created_at')
           .in('conversation_id', convIds)
           .order('id', { ascending: false })
-          .limit(600),
+          .limit(240),
       ]);
 
       const memberUserIds = [...new Set((allMembers || []).map((m) => m.user_id))];
       const { data: profiles } = memberUserIds.length
-        ? await supabase.from('profiles').select('user_id, username, full_name, avatar_url').in('user_id', memberUserIds)
+        ? await db.from('profiles').select('user_id, username, full_name, avatar_url').in('user_id', memberUserIds)
         : { data: [] };
       const profileById = new Map((profiles || []).map((p) => [p.user_id, p]));
 
@@ -119,7 +120,7 @@ export default async function handler(req, res) {
           .eq('user_id', user.id);
         const ids = (mine || []).map((m) => m.conversation_id);
         if (ids.length) {
-          const { data: convs } = await supabase.from('conversations').select('id').in('id', ids).eq('is_group', false);
+          const { data: convs } = await db.from('conversations').select('id').in('id', ids).eq('is_group', false);
           const plist = (convs || []).map((c) => c.id);
           if (plist.length) {
             const { data: theirs } = await supabase
@@ -141,7 +142,7 @@ export default async function handler(req, res) {
       if (error) throw error;
 
       const rows = [user.id, ...memberIds].map((uid) => ({ conversation_id: conv.id, user_id: uid }));
-      const { error: mErr } = await supabase.from('conversation_members').insert(rows);
+      const { error: mErr } = await db.from('conversation_members').insert(rows);
       if (mErr) throw mErr;
 
       return res.status(201).json({ id: conv.id, existing: false });

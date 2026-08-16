@@ -1,14 +1,70 @@
 {
+  "headers": [
+    {
+      "source": "/seed/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Origin-Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), geolocation=(), payment=(), usb=(), interest-cohort=(), microphone=(self)"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "X-DNS-Prefetch-Control",
+          "value": "on"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'sha256-j0kWFFUV378+76inv7r2XOb2WKrMxxQXe1MeHSWjZmU=' 'sha256-DHfIXQwBc5j3Aob69LiyNZVwiGO7hpORdfq6giuKbHM=' 'sha256-sHSFhQ3GLY0qFszlPqqLhZZn1RcWV9YcqgiCzqbKTTc=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://frontend-cdn.perplexity.ai data:; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.googleusercontent.com https://lh3.google.com; media-src 'self' blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://oauth2.googleapis.com https://designarena.ai https://www.designarena.ai https://avs-gateway.vercel.app https://opencode.ai https://static.cloudflareinsights.com; frame-src https://accounts.google.com; frame-ancestors 'self' https://*.designarena.ai; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:"
+        }
+      ]
+    }
+  ],
   "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "https://vcioygsdxmqlmngjpsmo.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_oxp24Thotldwob3D1e32wA_EBDhLytq",
-    "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_WxHlQDbcnRYJma_ptyFtRQ_aQdEJqJX",
-    "VITE_SUPABASE_URL": "https://vcioygsdxmqlmngjpsmo.supabase.co",
-    "VITE_SUPABASE_ANON_KEY": "sb_publishable_oxp24Thotldwob3D1e32wA_EBDhLytq",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://ducnapzbjqmhjxpmsqez.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_u-WSJ6oD_EabXjdWwi5S_g_iH0y9yqO",
+    "SUPABASE_SERVICE_ROLE_KEY": "<set-via-Secrets-tab>",
+    "VITE_SUPABASE_URL": "https://ducnapzbjqmhjxpmsqez.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_u-WSJ6oD_EabXjdWwi5S_g_iH0y9yqO",
     "VITE_GOOGLE_CLIENT_ID": "1065078894672-rmp5kp8vfjns5rn9kp5psfp16g691043.apps.googleusercontent.com",
     "VITE_GOOGLE_AUTH_PROXY": "https://designarena.ai/auth/google/callback",
-    "FULLSTACK_PROJECT_REF": "vcioygsdxmqlmngjpsmo",
-    "FULLSTACK_RESTORE_API_URL": "https://designarena.ai/api/fullstack-restore",
-    "OPENCODE_API_KEY": "sk-Fc4ac08nEJWm8yY51omw6K8uOGJdgcjhLq9ez2KSfsc4akhTu8jvsPSw1yeHNilk"
+    "FULLSTACK_PROJECT_REF": "ducnapzbjqmhjxpmsqez",
+    "FULLSTACK_RESTORE_API_URL": "https://designarena.ai/api/fullstack-restore"
   }
 }

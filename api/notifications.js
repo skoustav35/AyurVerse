@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 async function getAuthUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -8,7 +8,8 @@ async function getAuthUser(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -34,10 +35,10 @@ export default async function handler(req, res) {
       // mark one read, or all read
       const id = req.body?.id ? parseInt(req.body.id, 10) : null;
       if (id) {
-        const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id).eq('user_id', user.id);
+        const { error } = await db.from('notifications').update({ read: true }).eq('id', id).eq('user_id', user.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+        const { error } = await db.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
         if (error) throw error;
       }
       return res.status(200).json({ ok: true });

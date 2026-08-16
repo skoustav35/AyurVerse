@@ -1,10 +1,11 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 const dayKey = (d) => new Date(d).toISOString().slice(0, 10);
 const monthKey = (d) => new Date(d).toISOString().slice(0, 7);
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -28,12 +29,12 @@ export default async function handler(req, res) {
 
     const [{ data: likeRows }, { data: commentRows }, { data: followerRows }] = await Promise.all([
       ids.length
-        ? supabase.from('likes').select('post_id, created_at').in('post_id', ids).limit(5000)
+        ? db.from('likes').select('post_id, created_at').in('post_id', ids).limit(5000)
         : Promise.resolve({ data: [] }),
       ids.length
-        ? supabase.from('comments').select('post_id, created_at').in('post_id', ids).limit(5000)
+        ? db.from('comments').select('post_id, created_at').in('post_id', ids).limit(5000)
         : Promise.resolve({ data: [] }),
-      supabase.from('follows').select('created_at, follower_id').eq('followee_id', user.id).limit(5000),
+      db.from('follows').select('created_at, follower_id').eq('followee_id', user.id).limit(5000),
     ]);
 
     const now = Date.now();

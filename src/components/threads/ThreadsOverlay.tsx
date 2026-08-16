@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
+  AlertCircle,
+  ArrowDown,
   ArrowLeft,
   Check,
   CheckCheck,
+  Clock3,
   Copy,
   CornerDownLeft,
   CornerUpRight,
@@ -13,6 +16,7 @@ import {
   Mic,
   Pause,
   Play,
+  Search,
   Send,
   SmilePlus,
   SquarePen,
@@ -38,6 +42,7 @@ import {
   useReactToMessage,
   useSendMessage,
   useThreads,
+  useMyProfile,
 } from '../../hooks/queries';
 import { useUI } from '../../store/ui';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -86,7 +91,21 @@ function richText(text: string, mine: boolean) {
 
 /* ------------------------------------------------------------ voice note */
 
-function VoiceNote({ src, mine }: { src: string; mine: boolean }) {
+let __waveCache = new Map<number, number[]>();
+function waveBars(seed: number): number[] {
+  const hit = __waveCache.get(seed);
+  if (hit) return hit;
+  let s = seed * 2654435761 >>> 0;
+  const bars = Array.from({ length: 30 }, () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return 22 + ((s / 4294967296) * 78);
+  });
+  if (__waveCache.size > 400) __waveCache = new Map();
+  __waveCache.set(seed, bars);
+  return bars;
+}
+
+function VoiceNote({ src, mine, seedKey }: { src: string; mine: boolean; seedKey: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [dur, setDur] = useState(0);
@@ -120,13 +139,21 @@ function VoiceNote({ src, mine }: { src: string; mine: boolean }) {
         {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
       </button>
       <div className="flex-1">
-        <div className={`h-1.5 rounded-full overflow-hidden ${mine ? 'bg-parchment/30' : 'bg-sand-200'}`}>
-          <div
-            className={`h-full rounded-full transition-[width] duration-150 ${mine ? 'bg-parchment' : 'bg-saffron-600'}`}
-            style={{ width: `${dur ? Math.min(100, (t / dur) * 100) : 0}%` }}
-          />
+        <div className="flex items-center gap-[2.5px] h-7" aria-hidden="true">
+          {waveBars(seedKey).map((h, i) => {
+            const played = dur > 0 && i / 30 <= t / dur;
+            return (
+              <span
+                key={i}
+                className={`w-[3px] rounded-full transition-colors duration-150 ${
+                  played ? (mine ? 'bg-parchment' : 'bg-saffron-600') : mine ? 'bg-parchment/35' : 'bg-sand-300'
+                }`}
+                style={{ height: `${h}%` }}
+              />
+            );
+          })}
         </div>
-        <p className={`text-[10px] mt-1 ${mine ? 'text-parchment/85' : 'text-ink-500'}`}>
+        <p className={`text-[10px] mt-0.5 ${mine ? 'text-parchment/85' : 'text-ink-500'}`}>
           {formatDuration(t)} / {formatDuration(dur)}
         </p>
       </div>
@@ -169,13 +196,19 @@ interface BubbleProps {
   msg: ChatMessage;
   mine: boolean;
   grouped: boolean;
+  showName: boolean;
   parent: ChatMessage | null;
   onReact: (emoji: string) => void;
   onReply: () => void;
   onUnsend: () => void;
+  onRetry: () => void;
+  onShowImage: (url: string) => void;
 }
 
-function Bubble({ msg, mine, grouped, parent, onReact, onReply, onUnsend }: BubbleProps) {
+const bubbleTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+
+function Bubble({ msg, mine, grouped, showName, parent, onReact, onReply, onUnsend, onRetry, onShowImage }: BubbleProps) {
   const pushToast = useUI((s) => s.pushToast);
   const [picker, setPicker] = useState(false);
   const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
@@ -275,6 +308,9 @@ function Bubble({ msg, mine, grouped, parent, onReact, onReply, onUnsend }: Bubb
             </div>
           )}
 
+          {showName && (
+            <p className="text-[10.5px] font-semibold mb-1 pl-1 text-saffron-700">{msg.sender_name.split(' ')[0]}</p>
+          )}
           <div
             onContextMenu={(e) => {
               e.preventDefault();
@@ -282,6 +318,8 @@ function Bubble({ msg, mine, grouped, parent, onReact, onReply, onUnsend }: Bubb
             }}
             onDoubleClick={() => onReact('❤️')}
             className={`${
+              msg.failed ? 'opacity-80 ring-2 ring-terra-500/60 rounded-2xl' : msg.pending ? 'opacity-70' : ''
+            } ${
               msg.type === 'text'
                 ? mine
                   ? 'rounded-3xl rounded-br-md bg-gradient-to-br from-saffron-500 to-saffron-600 text-parchment px-4 py-2.5 shadow-[0_6px_18px_-8px_rgba(217,111,16,0.5)]'
@@ -291,27 +329,43 @@ function Bubble({ msg, mine, grouped, parent, onReact, onReply, onUnsend }: Bubb
                   : 'rounded-2xl'
             }`}
           >
-            {!mine && !grouped && msg.type === 'text' && (
-              <p className="text-[10.5px] font-semibold mb-0.5 text-saffron-700">{msg.sender_name.split(' ')[0]}</p>
-            )}
-
             {msg.type === 'text' && (
-              <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">{richText(plainBody, mine)}</p>
+              (() => {
+                const nameLabel = !mine && !grouped && !showName ? (
+                  <span className="block text-[10.5px] font-semibold mb-0.5 text-saffron-700">{msg.sender_name.split(' ')[0]}</span>
+                ) : null;
+                return (
+                  <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">
+                    {nameLabel}
+                    {richText(plainBody, mine)}
+                    <span className={`float-right ml-2.5 mt-2 text-[9.5px] select-none ${mine ? 'text-parchment/70' : 'text-ink-400'}`}>
+                      {bubbleTime(msg.created_at)}
+                      {msg.pending && ' ·…'}
+                    </span>
+                  </p>
+                );
+              })()
             )}
 
             {msg.type === 'image' && msg.media_url && (
-              <div className={`rounded-2xl overflow-hidden border ${mine ? 'border-saffron-500/40' : 'border-sand-300/70'}`}>
-                <a href={msg.media_url} target="_blank" rel="noreferrer">
+              <div className={`relative rounded-2xl overflow-hidden border ${mine ? 'border-saffron-500/40' : 'border-sand-300/70'}`}>
+                <button onClick={() => onShowImage(msg.media_url!)} className="block w-full cursor-zoom-in" aria-label="Open image">
                   <img src={msg.media_url} alt="shared media" className="w-full max-h-64 object-cover hover:opacity-95 transition-opacity" loading="lazy" />
-                </a>
+                </button>
                 {msg.body && <p className="text-[12px] text-ink-700 bg-parchment px-3 py-2">{richText(msg.body, false)}</p>}
+                <span className="absolute bottom-2 right-2.5 text-[9.5px] text-parchment/90 bg-neem-950/60 rounded-md px-1.5 py-0.5 backdrop-blur-sm select-none">
+                  {bubbleTime(msg.created_at)}
+                </span>
               </div>
             )}
 
-            {msg.type === 'voice' && msg.media_url && <VoiceNote src={msg.media_url} mine={mine} />}
+            {msg.type === 'voice' && msg.media_url && <VoiceNote src={msg.media_url} mine={mine} seedKey={msg.id} />}
 
             {msg.type === 'sticker' && (
-              <p className="text-[54px] leading-none select-none py-1 drop-shadow-sm">{plainBody || '🪷'}</p>
+              <div className="relative inline-block">
+                <p className="text-[54px] leading-none select-none py-1 drop-shadow-sm">{plainBody || '🪷'}</p>
+                <span className="block text-right text-[9.5px] text-ink-400 select-none -mt-0.5">{bubbleTime(msg.created_at)}</span>
+              </div>
             )}
 
             {msg.type === 'post' && msg.post && <SharedPostCard post={msg.post} />}
@@ -333,6 +387,20 @@ function Bubble({ msg, mine, grouped, parent, onReact, onReply, onUnsend }: Bubb
                 </button>
               ))}
             </div>
+          )}
+
+          {msg.pending && (
+            <p className={`text-[10px] text-ink-400 mt-1 flex items-center gap-1 ${mine ? 'justify-end pr-1' : 'pl-1'}`}>
+              <Clock3 size={10} className="animate-spin" style={{ animationDuration: '2.4s' }} /> Weaving…
+            </p>
+          )}
+          {msg.failed && (
+            <button
+              onClick={onRetry}
+              className="mt-1 inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-terra-700 bg-terra-500/10 border border-terra-500/40 rounded-full px-2.5 py-1 hover:bg-terra-500/20 transition-colors"
+            >
+              <AlertCircle size={11} /> The thread dropped it — tap to retry
+            </button>
           )}
         </div>
       </div>
@@ -365,21 +433,52 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
   const markRead = useMarkThreadRead();
   const pushToast = useUI((s) => s.pushToast);
 
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => localStorage.getItem(`av_draft_${thread.id}`) || '');
   const [sendingImage, setSendingImage] = useState(false);
   const [stickersOpen, setStickersOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [recording, setRecording] = useState<RecorderCtl | null>(null);
   const [recSeconds, setRecSeconds] = useState(0);
   const [typists, setTypists] = useState<string[]>([]);
+  const [phantoms, setPhantoms] = useState<ChatMessage[]>([]);
+  const [jumpCount, setJumpCount] = useState(0);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingThrottle = useRef(0);
+  const atBottomRef = useRef(true);
+  const prevCountRef = useRef(0);
+  const didInitScrollRef = useRef(false);
+  const openedReadRef = useRef<string | null>(null);
+  const draftKeyRef = useRef(`av_draft_${thread.id}`);
 
-  const byId = useMemo(() => new Map((messages ?? []).map((m) => [m.id, m])), [messages]);
-  const myName = (user?.user_metadata?.full_name as string | undefined) || user?.email?.split('@')[0] || 'weaver';
+  useEffect(() => {
+    const key = `av_draft_${thread.id}`;
+    draftKeyRef.current = key;
+    setDraft(localStorage.getItem(key) || '');
+    setPhantoms([]);
+    setJumpCount(0);
+    setReplyTo(null);
+    setStickersOpen(false);
+    didInitScrollRef.current = false;
+    prevCountRef.current = 0;
+    const me = thread.members.find((m) => m.user_id === user?.id);
+    openedReadRef.current = me?.last_read_at ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread.id]);
+
+  useEffect(() => {
+    const key = draftKeyRef.current;
+    if (draft.trim()) localStorage.setItem(key, draft);
+    else localStorage.removeItem(key);
+  }, [draft]);
+
+  const byId = useMemo(() => new Map<number, ChatMessage>((messages?.items ?? []).map((m) => [m.id, m])), [messages]);
+  const meProfile = useMyProfile().data;
+  const myName = meProfile?.full_name || (user?.user_metadata?.full_name as string | undefined) || user?.email?.split('@')[0] || 'weaver';
   const others = thread.members.filter((m) => m.user_id !== user?.id);
   const onlineIds = usePresence();
   const otherOnline = !thread.is_group && others.some((m) => onlineIds.has(m.user_id));
@@ -392,8 +491,8 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const m = payload.new as ChatMessage;
         if (m.conversation_id !== thread.id) return;
-        queryClient.setQueryData<ChatMessage[]>(['messages', thread.id], (old) =>
-          old && !old.some((x) => x.id === m.id) ? [...old, m] : old,
+        queryClient.setQueryData<{ items: ChatMessage[]; has_more?: boolean }>(['messages', thread.id], (old) =>
+          old ? (old.items.some((x) => x.id === m.id) ? old : { ...old, items: [...old.items, m] }) : { items: [m], has_more: false },
         );
         queryClient.invalidateQueries({ queryKey: ['threads'] });
         if (m.sender_id !== user?.id) markRead.mutate(thread.id);
@@ -401,15 +500,15 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
         const m = payload.new as ChatMessage;
         if (m.conversation_id !== thread.id) return;
-        queryClient.setQueryData<ChatMessage[]>(['messages', thread.id], (old) =>
-          old ? old.map((x) => (x.id === m.id ? { ...x, reactions: m.reactions } : x)) : old,
+        queryClient.setQueryData<{ items: ChatMessage[]; has_more?: boolean }>(['messages', thread.id], (old) =>
+          old ? { ...old, items: old.items.map((x) => (x.id === m.id ? { ...x, reactions: m.reactions } : x)) } : old,
         );
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
         const oldId = (payload.old as { id?: number }).id;
         if (oldId)
-          queryClient.setQueryData<ChatMessage[]>(['messages', thread.id], (old) =>
-            old ? old.filter((x) => x.id !== oldId) : old,
+          queryClient.setQueryData<{ items: ChatMessage[]; has_more?: boolean }>(['messages', thread.id], (old) =>
+            old ? { ...old, items: old.items.filter((x) => x.id !== oldId) } : old,
           );
         queryClient.invalidateQueries({ queryKey: ['threads'] });
       })
@@ -434,9 +533,75 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread.id]);
 
+  const list = useMemo(() => messages?.items ?? [], [messages]);
+  const hasMore = !!messages?.has_more;
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const fullList = useMemo(() => [...list, ...phantoms], [list, phantoms]);
+
+  const loadOlder = async () => {
+    if (loadingOlder || !list.length) return;
+    setLoadingOlder(true);
+    const el = scrollRef.current;
+    const prevHeight = el?.scrollHeight ?? 0;
+    try {
+      const data = await apiFetch<{ items: ChatMessage[]; has_more?: boolean }>(
+        `/api/messages?conversation_id=${thread.id}&before=${list[0].id}&limit=60`,
+      );
+      queryClient.setQueryData<{ items: ChatMessage[]; has_more?: boolean }>(['messages', thread.id], (old) => ({
+        items: [...data.items, ...(old?.items ?? [])],
+        has_more: !!data.has_more,
+      }));
+      requestAnimationFrame(() => {
+        const elNow = scrollRef.current;
+        if (elNow) elNow.scrollTop += elNow.scrollHeight - prevHeight;
+      });
+    } catch {
+      pushToast('The older weave refused to surface — try again', 'error');
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
+    atBottomRef.current = near;
+    if (near) setJumpCount(0);
+  };
+
+  const scrollDown = (smooth = true) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    atBottomRef.current = true;
+    setJumpCount(0);
+  };
+
+  /* first paint lands at the newest note instantly; after that, growth glides if
+     the reader is home, or raises the jump chip if they are up-thread */
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages?.length, recording !== null]);
+    if (!isLoading && !didInitScrollRef.current && fullList.length) {
+      didInitScrollRef.current = true;
+      requestAnimationFrame(() => scrollDown(false));
+    }
+  }, [isLoading, fullList.length]);
+
+  useEffect(() => {
+    if (fullList.length <= prevCountRef.current) {
+      prevCountRef.current = fullList.length;
+      return;
+    }
+    prevCountRef.current = fullList.length;
+    const last = fullList[fullList.length - 1];
+    if (!last) return;
+    if (last.sender_id === user?.id || atBottomRef.current) {
+      requestAnimationFrame(() => scrollDown(true));
+    } else {
+      setJumpCount((c) => c + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullList.length, recording !== null]);
 
   const broadcastTyping = () => {
     const nowTs = Date.now();
@@ -445,13 +610,47 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
     channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { name: myName.split(' ')[0] } });
   };
 
+  /* optimistic lane: paint the bubble instantly, settle (or retry) when the loom answers */
+  const sendWithPhantom = (payload: { type: ChatMessage['type']; body?: string; media_url?: string; post_id?: number }) => {
+    const temp: ChatMessage = {
+      id: -Date.now(),
+      conversation_id: thread.id,
+      sender_id: user?.id || '',
+      sender_name: myName,
+      sender_avatar: (meProfile?.avatar_url || user?.user_metadata?.avatar_url || null) as string | null,
+      type: payload.type,
+      body: payload.body ?? null,
+      media_url: payload.media_url ?? null,
+      post_id: payload.post_id ?? null,
+      reactions: [],
+      created_at: new Date().toISOString(),
+      pending: true,
+    };
+    setPhantoms((p) => [...p, temp]);
+    sendMessage.mutate(payload, {
+      onSuccess: () => setPhantoms((p) => p.filter((x) => x.id !== temp.id)),
+      onError: () => setPhantoms((p) => p.map((x) => (x.id === temp.id ? { ...x, pending: false, failed: true } : x))),
+    });
+  };
+
+  const retryPhantom = (m: ChatMessage) => {
+    setPhantoms((p) => p.filter((x) => x.id !== m.id));
+    sendWithPhantom({
+      type: m.type,
+      body: m.body ?? undefined,
+      media_url: m.media_url ?? undefined,
+      post_id: m.post_id ?? undefined,
+    });
+  };
+
   const submit = () => {
     const raw = draft.trim();
-    if (!raw || sendMessage.isPending) return;
+    if (!raw) return;
     const body = replyTo ? `⟦r:${replyTo.id}⟧${raw}` : raw;
-    sendMessage.mutate({ type: 'text', body });
+    sendWithPhantom({ type: 'text', body });
     setDraft('');
     setReplyTo(null);
+    if (composerRef.current) composerRef.current.style.height = 'auto';
   };
 
   const sendImage = async (file: File) => {
@@ -462,7 +661,7 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
     setSendingImage(true);
     try {
       const url = await uploadMedia(file);
-      sendMessage.mutate({ type: 'image', media_url: url, body: draft.trim() || undefined });
+      sendWithPhantom({ type: 'image', media_url: url, body: draft.trim() || undefined });
       setDraft('');
     } catch (err) {
       pushToast((err as Error).message, 'error');
@@ -472,9 +671,17 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
   };
 
   const sendSticker = (emoji: string) => {
-    sendMessage.mutate({ type: 'sticker', body: emoji });
+    sendWithPhantom({ type: 'sticker', body: emoji });
     setStickersOpen(false);
   };
+
+  /* close lightbox with Escape */
+  useEffect(() => {
+    if (!lightbox) return;
+    const on = (e: KeyboardEvent) => e.key === 'Escape' && setLightbox(null);
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, [lightbox]);
 
   /* ---- voice notes ---- */
   const startRecording = async () => {
@@ -492,7 +699,7 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
         if (ctl.chunks.length === 0 || blob.size < 400) return; // too short / cancelled
         try {
           const url = await uploadMedia(new File([blob], `voice-${Date.now()}.webm`, { type: blob.type }));
-          sendMessage.mutate({ type: 'voice', media_url: url });
+          sendWithPhantom({ type: 'voice', media_url: url });
         } catch (err) {
           pushToast((err as Error).message, 'error');
         }
@@ -525,8 +732,14 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
   }, [recording]);
 
   /* seen receipts */
-  const list = messages ?? [];
   const lastOwn = [...list].reverse().find((m) => m.sender_id === user?.id);
+  const unreadFromId = (() => {
+    const cut = openedReadRef.current;
+    if (!cut) return null;
+    const t0 = new Date(cut).getTime();
+    const firstNew = fullList.find((mm) => mm.sender_id !== user?.id && !mm.pending && new Date(mm.created_at).getTime() > t0);
+    return firstNew?.id ?? null;
+  })();
   const seenBy =
     lastOwn
       ? others.filter((m) => m.last_read_at && new Date(m.last_read_at).getTime() >= new Date(lastOwn.created_at).getTime())
@@ -571,7 +784,8 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 relative bg-[radial-gradient(120%_80%_at_50%_0%,#f6efdf_0%,#f2ead8_60%,#eaddc4_100%)]">
+      <div className="relative flex-1 min-h-0">
+      <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto px-4 py-4 relative bg-[radial-gradient(120%_80%_at_50%_0%,#f6efdf_0%,#f2ead8_60%,#eaddc4_100%)]">
         <Mandala className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] h-[440px] text-neem-600/[0.055] animate-spin-slower" />
         {isLoading && (
           <div className="h-full grid place-items-center">
@@ -589,11 +803,24 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
           </div>
         )}
 
-        {list.map((m, i) => {
+        {hasMore && !isLoading && (
+          <div className="flex justify-center mb-3 relative z-10">
+            <button
+              onClick={loadOlder}
+              disabled={loadingOlder}
+              className="inline-flex items-center gap-1.5 rounded-full border border-sand-300 bg-parchment/90 px-4 py-1.5 text-[11.5px] font-semibold text-ink-600 hover:border-gold-400 hover:text-saffron-700 transition-colors shadow-sm disabled:opacity-50"
+            >
+              {loadingOlder ? <Loader2 size={12} className="animate-spin" /> : null}
+              Bring earlier notes down the thread
+            </button>
+          </div>
+        )}
+
+        {fullList.map((m, i) => {
           const day = new Date(m.created_at).toDateString();
           const showDay = day !== lastDay;
           lastDay = day;
-          const prev = list[i - 1];
+          const prev = fullList[i - 1];
           const grouped =
             !!prev &&
             prev.sender_id === m.sender_id &&
@@ -611,16 +838,28 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
                   </span>
                 </p>
               )}
+              {unreadFromId === m.id && (
+                <div className="flex items-center gap-3 my-4" role="separator" aria-label="New messages">
+                  <span className="flex-1 h-px bg-saffron-500/40" />
+                  <span className="text-[9.5px] uppercase tracking-[0.2em] font-bold text-saffron-700 bg-saffron-500/10 border border-saffron-500/40 rounded-full px-3 py-1">
+                    New notes
+                  </span>
+                  <span className="flex-1 h-px bg-saffron-500/40" />
+                </div>
+              )}
               <Bubble
                 msg={m}
                 mine={m.sender_id === user?.id}
                 grouped={grouped}
+                showName={thread.is_group && m.sender_id !== user?.id && !grouped}
                 parent={parent}
-                onReact={(e) => reactTo.mutate({ messageId: m.id, emoji: e })}
-                onReply={() => setReplyTo(m)}
-                onUnsend={() => deleteMessage.mutate(m.id)}
+                onReact={(e) => { if (!m.pending && !m.failed) reactTo.mutate({ messageId: m.id, emoji: e }); }}
+                onReply={() => { if (!m.pending && !m.failed) setReplyTo(m); }}
+                onUnsend={() => (m.pending || m.failed ? setPhantoms((p) => p.filter((x) => x.id !== m.id)) : deleteMessage.mutate(m.id))}
+                onRetry={() => retryPhantom(m)}
+                onShowImage={(url) => setLightbox(url)}
               />
-              {lastOwn?.id === m.id && (
+              {lastOwn?.id === m.id && !m.pending && !m.failed && (
                 <p className="text-right text-[9.5px] font-medium text-ink-400 mt-1 pr-1 flex items-center justify-end gap-1">
                   {seenBy.length > 0 ? (
                     <>
@@ -652,6 +891,23 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
             </div>
           </motion.div>
         )}
+      </div>
+
+      <AnimatePresence>
+        {jumpCount > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: 12, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+            onClick={() => scrollDown(true)}
+            className="absolute bottom-4 right-4 z-20 inline-flex items-center gap-1.5 rounded-full bg-neem-800 text-parchment text-[11.5px] font-semibold pl-3 pr-4 py-2 shadow-warm hover:bg-neem-900"
+          >
+            <ArrowDown size={13} />
+            {jumpCount} new {jumpCount === 1 ? 'note' : 'notes'}
+          </motion.button>
+        )}
+      </AnimatePresence>
       </div>
 
       {/* reply context */}
@@ -757,16 +1013,19 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
             >
               <Sticker size={19} />
             </button>
-            <input
+            <textarea
+              ref={composerRef}
               value={draft}
+              rows={1}
               onChange={(e) => {
                 setDraft(e.target.value);
                 broadcastTyping();
+                const el = e.currentTarget;
+                el.style.height = 'auto';
+                el.style.height = `${Math.min(116, el.scrollHeight)}px`;
               }}
               onFocus={() => {
-                window.setTimeout(() => {
-                  scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-                }, 350);
+                window.setTimeout(() => scrollDown(true), 350);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -774,8 +1033,8 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
                   submit();
                 }
               }}
-              placeholder="Write on the golden thread… *(**bold** _italic_ `code`)*"
-              className="flex-1 min-w-0 rounded-full border border-sand-300 bg-parchment-deep/60 px-4 py-2.5 text-[13.5px] text-ink-800 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-gold-400/60 focus:border-gold-400"
+              placeholder="Write on the golden thread… (**bold** _italic_ `code`)"
+              className="flex-1 min-w-0 rounded-[22px] border border-sand-300 bg-parchment-deep/60 px-4 py-2.5 text-[13.5px] leading-relaxed text-ink-800 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-gold-400/60 focus:border-gold-400 resize-none overflow-y-auto"
             />
             {draft.trim() ? (
               <motion.button
@@ -802,35 +1061,73 @@ function ChatPane({ thread, onBack }: { thread: Thread; onBack: () => void }) {
           </div>
         )}
       </div>
+
+      {/* image lightbox */}
+      <AnimatePresence>
+        {lightbox && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightbox(null)}
+            className="fixed inset-0 z-[92] grid place-items-center bg-neem-950/85 backdrop-blur-md p-4 sm:p-8 cursor-zoom-out"
+          >
+            <motion.img
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+              src={lightbox}
+              alt="shared media enlarged"
+              className="max-h-[86vh] max-w-full rounded-2xl border border-parchment/25 shadow-warm object-contain"
+            />
+            <button
+              onClick={() => setLightbox(null)}
+              className="absolute top-4 right-4 grid place-items-center w-10 h-10 rounded-full bg-parchment/15 text-parchment hover:bg-parchment/25 backdrop-blur"
+              aria-label="Close image"
+            >
+              <X size={18} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 /* --------------------------------------------------------------- new thread */
 
-function useThreadsPeoplePicker() {
+function useThreadsPeoplePicker(q: string) {
   const [data, setData] = useState<Profile[] | undefined>(undefined);
+  const [fetching, setFetching] = useState(false);
+  const [dq, setDq] = useState('');
+  useEffect(() => {
+    const t = window.setTimeout(() => setDq(q.trim()), 220);
+    return () => window.clearTimeout(t);
+  }, [q]);
   useEffect(() => {
     let alive = true;
-    apiFetch<Profile[]>('/api/profiles?limit=30')
+    setFetching(true);
+    apiFetch<Profile[]>(`/api/profiles?limit=30${dq ? `&q=${encodeURIComponent(dq)}` : ''}`)
       .then((rows) => alive && setData(rows))
-      .catch(() => alive && setData([]));
+      .catch(() => alive && setData([]))
+      .finally(() => alive && setFetching(false));
     return () => {
       alive = false;
     };
-  }, []);
-  return { data };
+  }, [dq]);
+  return { data, fetching };
 }
 
-function NewThreadSheet({ onClose }: { onClose: () => void }) {
+function NewThreadSheet({ onClose, initialQuery = '' }: { onClose: () => void; initialQuery?: string }) {
   const { user } = useAuth();
   const openThread = useUI((s) => s.openThread);
   const createThread = useCreateThread();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [name, setName] = useState('');
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initialQuery);
 
-  const { data: all } = useThreadsPeoplePicker();
+  const { data: all, fetching } = useThreadsPeoplePicker(q);
   const list = (all ?? []).filter((p) => p.user_id !== user?.id);
   const filtered = q
     ? list.filter(
@@ -913,7 +1210,10 @@ function NewThreadSheet({ onClose }: { onClose: () => void }) {
             </button>
           );
         })}
-        {filtered.length === 0 && (
+        {fetching && (
+          <p className="text-center text-[12px] tracking-wide text-ink-400 py-3 animate-pulse">Asking the atelier…</p>
+        )}
+        {filtered.length === 0 && !fetching && (
           <p className="text-center text-sm text-ink-500 italic font-display py-8">No weaver answers to that name.</p>
         )}
       </div>
@@ -952,11 +1252,22 @@ export default function ThreadsScreen() {
   const onlineIds = usePresence();
   const { data: threads, isLoading } = useThreads(true);
   const [creating, setCreating] = useState(false);
+  const [inboxQ, setInboxQ] = useState('');
+  const [sheetQuery, setSheetQuery] = useState('');
 
   const activeThread = useMemo(
     () => threads?.find((t) => t.id === activeThreadId) ?? null,
     [threads, activeThreadId],
   );
+
+  const shownThreads = useMemo(() => {
+    const q0 = inboxQ.trim().toLowerCase();
+    const arr = threads ?? [];
+    if (!q0) return arr;
+    return arr.filter(
+      (t) => t.title.toLowerCase().includes(q0) || previewText(t).toLowerCase().includes(q0),
+    );
+  }, [threads, inboxQ]);
 
   return (
     <div className="relative h-[calc(var(--vvh,100dvh)-118px)] lg:h-[calc(100vh-24px)] flex overflow-hidden bg-parchment lg:rounded-3xl lg:border lg:border-sand-300/60 lg:mx-2">
@@ -987,6 +1298,25 @@ export default function ThreadsScreen() {
             </div>
           </div>
 
+          {/* inbox search — threads by name or last whisper */}
+          <div className="px-4 py-2.5 border-b border-sand-300/60">
+            <label className="flex items-center gap-2.5 rounded-full bg-sand-200/60 border border-sand-300/70 px-3.5 py-[7px] transition-shadow focus-within:ring-2 focus-within:ring-gold-400/50 focus-within:border-gold-400">
+              <Search size={14} className="text-ink-400 shrink-0" />
+              <input
+                value={inboxQ}
+                onChange={(e) => setInboxQ(e.target.value)}
+                placeholder="Search threads…"
+                className="flex-1 min-w-0 bg-transparent text-[13px] text-ink-800 placeholder:text-ink-400 focus:outline-none"
+                aria-label="Search threads"
+              />
+              {inboxQ && (
+                <button onClick={() => setInboxQ('')} className="p-0.5 rounded-full text-ink-400 hover:text-ink-700" aria-label="Clear search">
+                  <X size={13} />
+                </button>
+              )}
+            </label>
+          </div>
+
           <div className="flex-1 overflow-y-auto py-2">
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => (
@@ -1015,7 +1345,23 @@ export default function ThreadsScreen() {
               </div>
             )}
 
-            {(threads ?? []).map((t) => (
+            {inboxQ.trim() && (
+              <button
+                onClick={() => {
+                  setSheetQuery(inboxQ.trim());
+                  setCreating(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-sand-200/50 border-b border-sand-200/70 transition-colors"
+              >
+                <span className="grid place-items-center w-11 h-11 rounded-full bg-gold-400/15 text-gold-700 shrink-0">
+                  <Users size={18} />
+                </span>
+                <span className="text-[13px] text-ink-700">
+                  Find every weaver named <span className="font-semibold text-saffron-700">“{inboxQ.trim()}”</span>
+                </span>
+              </button>
+            )}
+            {shownThreads.map((t) => (
               <button
                 key={t.id}
                 onClick={() => openThread(t.id)}
@@ -1082,7 +1428,7 @@ export default function ThreadsScreen() {
               transition={{ type: 'spring', stiffness: 320, damping: 30 }}
               className="absolute inset-x-3 bottom-3 lg:inset-auto lg:right-6 lg:bottom-6 lg:w-[400px] card-warm !rounded-3xl shadow-warm z-10 max-h-[80%] overflow-y-auto"
             >
-              <NewThreadSheet onClose={() => setCreating(false)} />
+              <NewThreadSheet onClose={() => setCreating(false)} initialQuery={sheetQuery} />
             </motion.div>
           )}
         </AnimatePresence>

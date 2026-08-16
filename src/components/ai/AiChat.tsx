@@ -41,6 +41,7 @@ interface Session {
   updatedAt: number;
 }
 
+// The house mind is fixed by covenant: Sarvam 105B M runs the show.
 const QUICK_PROMPTS = [
   { icon: Feather, label: 'Write & publish a lore post', text: 'Write and publish a Deep Lore post about the three doshas of Ayurveda — give it a distinct title, a one-line summary, tags, and a rich manuscript.' },
   { icon: SearchIcon, label: 'Find weavers to follow', text: 'Find some interesting weavers I could follow and tell me about them.' },
@@ -84,6 +85,8 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
   const [input, setInput] = useState('');
   const [pending, setPending] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // when an answer arrives it pours in like ink — not a statue
+  const [stream, setStream] = useState<{ ts: number; shown: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const loadedRef = useRef(false);
@@ -119,7 +122,33 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages.length, pending]);
+  }, [messages.length, pending, stream?.shown]);
+
+  // progressive ink: reveal the freshest answer character-by-character,
+  // pace-adaptive so a manuscript never outstays a stanza
+  useEffect(() => {
+    if (!stream) return;
+    const msg = messages.find((m) => m.ts === stream.ts && m.role === 'assistant');
+    if (!msg) {
+      setStream(null);
+      return;
+    }
+    const total = msg.content.length;
+    if (stream.shown >= total) {
+      setStream(null);
+      return;
+    }
+    const perTick = Math.max(4, Math.ceil(total / 110));
+    const iv = window.setInterval(() => {
+      setStream((cur) => {
+        if (!cur) return null;
+        const next = cur.shown + perTick;
+        return next >= total ? null : { ...cur, shown: next };
+      });
+    }, 24);
+    return () => window.clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream?.ts, stream === null]);
 
   const autoGrow = () => {
     const ta = taRef.current;
@@ -177,6 +206,7 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
       });
       const asst: ChatMsg = { role: 'assistant', content: res.reply || '…', actions: res.actions ?? [], ts: Date.now() };
       patchActive((s) => ({ ...s, messages: [...s.messages, asst], updatedAt: Date.now() }));
+      setStream({ ts: asst.ts, shown: 0 });
 
       // if the agent changed account state, refresh the relevant caches
       if (res.actions && res.actions.length) {
@@ -187,6 +217,7 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
       }
     } catch (err) {
       const asst: ChatMsg = { role: 'assistant', content: (err as Error).message || 'Something interrupted the thread. Try again in a moment.', ts: Date.now(), error: true };
+      setStream({ ts: asst.ts, shown: 0 });
       patchActive((s) => ({ ...s, messages: [...s.messages, asst], updatedAt: Date.now() }));
     } finally {
       setPending(false);
@@ -204,7 +235,7 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
             </span>
             <div className="min-w-0">
               <p className="font-display font-semibold text-[15.5px] text-neem-950 leading-tight">Vaidya</p>
-              <p className="text-[10.5px] text-ink-500 leading-tight truncate">your in-account AI · powered by big-pickle</p>
+              <p className="text-[10.5px] text-ink-500 leading-tight truncate">your in-account AI · Sarvam 105B M · deep thought on</p>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -291,7 +322,7 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
         )}
 
         {messages.map((m, i) => (
-          <MessageBubble key={i} msg={m} />
+          <MessageBubble key={i} msg={m} liveCount={stream && stream.ts === m.ts ? stream.shown : undefined} />
         ))}
 
         {pending && (
@@ -348,7 +379,9 @@ export default function AiChat({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function MessageBubble({ msg }: { msg: ChatMsg }) {
+function MessageBubble({ msg, liveCount }: { msg: ChatMsg; liveCount?: number }) {
+  const streaming = liveCount !== undefined && liveCount < msg.content.length;
+  const shown = liveCount === undefined ? msg.content : msg.content.slice(0, liveCount);
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -366,9 +399,16 @@ function MessageBubble({ msg }: { msg: ChatMsg }) {
       <div className="max-w-[85%] min-w-0">
         <div className={`rounded-2xl rounded-tl-md px-4 py-3 border ${msg.error ? 'bg-terra-500/10 border-terra-500/30' : 'bg-parchment border-sand-300'}`}>
           <div className="prose-vaidya text-[13.5px] text-ink-800 leading-relaxed break-words">
-            <Suspense fallback={<p className="text-[13.5px] whitespace-pre-wrap">{msg.content}</p>}>
-              <Markdown source={msg.content} />
+            <Suspense fallback={<p className="text-[13.5px] whitespace-pre-wrap">{shown}</p>}>
+              <Markdown source={shown} />
             </Suspense>
+            {streaming && (
+              <motion.span
+                animate={{ opacity: [1, 0.15, 1] }}
+                transition={{ repeat: Infinity, duration: 0.7 }}
+                className="inline-block w-[7px] h-[15px] ml-0.5 rounded-[2px] bg-gold-500 align-middle -translate-y-[1px]"
+              />
+            )}
           </div>
         </div>
         {msg.actions && msg.actions.length > 0 && (

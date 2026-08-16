@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 /*
  * Explore — the discovery engine behind the Library tab.
@@ -25,13 +25,21 @@ function heat(p, halfLife = 12) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+    // Edge caching: anonymous reads are shared across the CDN; authed reads
+    // carry personal flags (liked/saved), so they stay private and uncached.
+    res.setHeader(
+      'Cache-Control',
+      req.headers.authorization ? 'private, no-store' : 'public, s-maxage=15, stale-while-revalidate=30'
+    );
     const user = await getAuthUser(req);
 
     // candidate pool
@@ -86,10 +94,10 @@ export default async function handler(req, res) {
       .map(([tag, weight]) => ({ tag, weight: Math.round(weight) }));
 
     // rising circles (member_count + recency)
-    const { data: groupRows } = await supabase.from('groups').select('*').limit(100);
+    const { data: groupRows } = await db.from('groups').select('*').limit(100);
     let myGroups = new Set();
     if (user) {
-      const { data: mem } = await supabase.from('group_members').select('group_id').eq('user_id', user.id);
+      const { data: mem } = await db.from('group_members').select('group_id').eq('user_id', user.id);
       myGroups = new Set((mem || []).map((m) => m.group_id));
     }
     const circles = (groupRows || [])
@@ -103,10 +111,10 @@ export default async function handler(req, res) {
     for (const p of pool) authorLikes[p.author_id] = (authorLikes[p.author_id] || 0) + (p.likes_count || 0);
     let followingSet = new Set();
     if (user) {
-      const { data: fr } = await supabase.from('follows').select('followee_id').eq('follower_id', user.id);
+      const { data: fr } = await db.from('follows').select('followee_id').eq('follower_id', user.id);
       followingSet = new Set((fr || []).map((r) => r.followee_id));
     }
-    const { data: peopleRows } = await supabase.from('profiles').select('*').limit(60);
+    const { data: peopleRows } = await db.from('profiles').select('*').limit(60);
     const people = (peopleRows || [])
       .filter((pr) => pr.user_id !== user?.id && !followingSet.has(pr.user_id))
       .map((pr) => ({ pr, s: (authorLikes[pr.user_id] || 0) + 1 }))
@@ -120,8 +128,8 @@ export default async function handler(req, res) {
       const ids = shown.map((p) => p.id);
       if (ids.length) {
         const [{ data: likes }, { data: saves }] = await Promise.all([
-          supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
-          supabase.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
+          db.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
+          db.from('saves').select('post_id').eq('user_id', user.id).in('post_id', ids),
         ]);
         const likedSet = new Set((likes || []).map((l) => l.post_id));
         const savedSet = new Set((saves || []).map((s) => s.post_id));

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Avatar from '../common/Avatar';
 import { apiFetch } from '../../lib/api';
 import { uploadMedia } from '../../lib/upload';
-import { useStories } from '../../hooks/queries';
+import { useStories, useMyProfile } from '../../hooks/queries';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUI } from '../../store/ui';
 import type { StatusChannel, Story } from '../../lib/types';
@@ -341,7 +341,8 @@ export default function StoriesRow() {
   };
 
   const myName = (user?.user_metadata?.full_name as string | undefined) || 'you';
-  const myAvatar = user?.user_metadata?.avatar_url as string | undefined;
+  const meProfile = useMyProfile().data;
+  const myAvatar = (meProfile?.avatar_url || user?.user_metadata?.avatar_url) as string | undefined;
   const ownChannel = chans.find((c) => c.is_own);
   const ownSeen = ownChannel ? ownChannel.stories.every((s) => seen.has(s.id)) : false;
 

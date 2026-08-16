@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 /*
  * Deployment status — a read-only production-readiness probe.
@@ -16,7 +16,7 @@ async function getAuthUser(req) {
 
 async function count(table) {
   try {
-    const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });
+    const { count } = await db.from(table).select('*', { count: 'exact', head: true });
     return count || 0;
   } catch {
     return null;
@@ -24,7 +24,8 @@ async function count(table) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();

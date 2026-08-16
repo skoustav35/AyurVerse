@@ -1,8 +1,9 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 import { notify } from './notify.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -38,11 +39,11 @@ export default async function handler(req, res) {
 
       let following;
       if (existing) {
-        const { error } = await supabase.from('follows').delete().eq('id', existing.id);
+        const { error } = await db.from('follows').delete().eq('id', existing.id);
         if (error) throw error;
         following = false;
       } else {
-        const { error } = await supabase.from('follows').insert({ follower_id: user.id, followee_id: followee });
+        const { error } = await db.from('follows').insert({ follower_id: user.id, followee_id: followee });
         if (error) throw error;
         following = true;
         await notify({ recipientId: followee, actor: user, type: 'follow' });

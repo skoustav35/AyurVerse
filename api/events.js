@@ -1,9 +1,10 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 const ALLOWED_TYPES = new Set(['view', 'dwell', 'search']);
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
     };
 
     // interaction signals power personalization only — no public view counter
-    const { error } = await supabase.from('signals').insert(row);
+    const { error } = await db.from('signals').insert(row);
     if (error) throw error;
     return res.status(201).json({ ok: true });
   } catch (err) {

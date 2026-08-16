@@ -1,22 +1,39 @@
+import { lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 import Sidebar from './Sidebar';
 import SuggestedRail from './SuggestedRail';
 import FeedView from '../feed/FeedView';
-import ReelsView from '../reels/ReelsView';
-import SearchView from '../search/SearchView';
-import ProfileView from '../profile/ProfileView';
 import UserProfileOverlay from '../profile/UserProfile';
 import ReaderPane from '../reader/ReaderPane';
-import ThreadsScreen from '../threads/ThreadsScreen';
 import ShareTray from '../threads/ShareTray';
 import Composer from '../composer/Composer';
-import Mandala from '../common/Mandala';
-import AiChat from '../ai/AiChat';
+import Mandala, { LotusMark } from '../common/Mandala';
 import { useUI } from '../../store/ui';
+
+// heavy, non-default tabs stream in on demand — the wave a weaver pays at first
+// paint is only ever feed+shell
+const ReelsView = lazy(() => import('../reels/ReelsView'));
+const SearchView = lazy(() => import('../search/SearchView'));
+const ThreadsScreen = lazy(() => import('../threads/ThreadsScreen'));
+const ProfileView = lazy(() => import('../profile/ProfileView'));
+const AiChat = lazy(() => import('../ai/AiChat'));
+
+function ViewFallback() {
+  return (
+    <div className="grid place-items-center py-24">
+      <div className="text-gold-500 animate-pulse">
+        <LotusMark className="w-9 h-9" />
+      </div>
+    </div>
+  );
+}
 
 export default function DesktopShell() {
   const tab = useUI((s) => s.tab);
   const readerPostId = useUI((s) => s.readerPostId);
+  const vaidyaOpen = useUI((s) => s.vaidyaOpen);
+  const toggleVaidya = useUI((s) => s.toggleVaidya);
 
   return (
     <div className="h-screen w-full flex overflow-hidden relative">
@@ -40,11 +57,27 @@ export default function DesktopShell() {
             className="pt-4"
           >
             {tab === 'feed' && <FeedView />}
-            {tab === 'reels' && <ReelsView />}
+            {tab === 'reels' && (
+              <Suspense fallback={<ViewFallback />}>
+                <ReelsView />
+              </Suspense>
+            )}
             {tab === 'forge' && <FeedView kind="forge" />}
-            {tab === 'search' && <SearchView />}
-            {tab === 'threads' && <ThreadsScreen />}
-            {tab === 'profile' && <ProfileView />}
+            {tab === 'search' && (
+              <Suspense fallback={<ViewFallback />}>
+                <SearchView />
+              </Suspense>
+            )}
+            {tab === 'threads' && (
+              <Suspense fallback={<ViewFallback />}>
+                <ThreadsScreen />
+              </Suspense>
+            )}
+            {tab === 'profile' && (
+              <Suspense fallback={<ViewFallback />}>
+                <ProfileView />
+              </Suspense>
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -79,7 +112,9 @@ export default function DesktopShell() {
               transition={{ duration: 0.24, ease: 'easeOut' }}
               className="h-full"
             >
-              <AiChat />
+              <Suspense fallback={<ViewFallback />}>
+                <AiChat />
+              </Suspense>
             </motion.div>
           ) : (
             <motion.div
@@ -99,6 +134,35 @@ export default function DesktopShell() {
       <UserProfileOverlay />
       <ShareTray />
       <Composer />
+
+      {/* Vaidya — summonable from any tab: a sage in a golden pause */}
+      <motion.button
+        onClick={toggleVaidya}
+        whileTap={{ scale: 0.9 }}
+        whileHover={{ scale: 1.05, rotate: -4 }}
+        className="fixed bottom-6 right-6 z-[64] grid place-items-center w-[52px] h-[52px] rounded-full bg-gradient-to-br from-neem-800 to-neem-950 shadow-[0_14px_36px_-10px_rgba(18,41,28,0.65)] ring-2 ring-gold-500/50"
+        aria-label="Ask Vaidya"
+        title="Ask Vaidya"
+      >
+        <Sparkles size={20} className="text-gold-400" />
+        <span className="absolute inset-0 rounded-full border border-gold-400/40 animate-ping-slow" />
+      </motion.button>
+      <AnimatePresence>
+        {vaidyaOpen && (
+          <motion.aside
+            key="vaidya-pane"
+            initial={{ x: 480, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 480, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 34 }}
+            className="fixed right-0 top-0 z-[63] h-full w-[460px] max-w-full border-l border-sand-300 bg-parchment shadow-[-24px_0_60px_-24px_rgba(23,42,31,0.45)]"
+          >
+            <Suspense fallback={<ViewFallback />}>
+              <AiChat onClose={toggleVaidya} />
+            </Suspense>
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 /* ------------------------------------------------------------------ *
  *  AyurVerse Library search — fuzzy, forgiving, never-empty.
@@ -214,13 +214,21 @@ function scorePost(p, ctx) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+    // Edge caching: anonymous reads are shared across the CDN; authed reads
+    // carry personal flags (liked/saved), so they stay private and uncached.
+    res.setHeader(
+      'Cache-Control',
+      req.headers.authorization ? 'private, no-store' : 'public, s-maxage=15, stale-while-revalidate=30'
+    );
 
     const raw = String(req.query.q || '').trim();
     const kind = req.query.kind ? String(req.query.kind) : null;
@@ -258,11 +266,11 @@ export default async function handler(req, res) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 30)
         .map((s) => s.p);
-      const { data: peopleRows } = await supabase.from('profiles').select('*').limit(8);
-      const { data: discoGroups } = await supabase.from('groups').select('*').order('member_count', { ascending: false }).limit(8);
+      const { data: peopleRows } = await db.from('profiles').select('*').limit(8);
+      const { data: discoGroups } = await db.from('groups').select('*').order('member_count', { ascending: false }).limit(8);
       let myG = new Set();
       if (user) {
-        const { data: mem } = await supabase.from('group_members').select('group_id').eq('user_id', user.id);
+        const { data: mem } = await db.from('group_members').select('group_id').eq('user_id', user.id);
         myG = new Set((mem || []).map((m) => m.group_id));
       }
       return res.status(200).json({
@@ -343,7 +351,25 @@ export default async function handler(req, res) {
     const items = bucket.slice(0, 30).map((r) => r.p);
 
     /* ---------- people: exact + fuzzy ---------- */
-    const { data: peopleRows } = await supabase.from('profiles').select('*').limit(150);
+    // Server-side prefilter (PostgREST ILIKE) over the first terms keeps the
+    // scoring pool bounded no matter how many weavers join — no full-table hugs.
+    const peoplePoolQ = terms.length
+      ? supabase
+          .from('profiles')
+          .select('*')
+          .or(
+            terms
+              .slice(0, 4)
+              .flatMap((t) => {
+                const s = t.replace(/[%_,()"\\]/g, '');
+                if (!s) return [];
+                return [`username.ilike.%${s}%`, `full_name.ilike.%${s}%`];
+              })
+              .join(','),
+          )
+          .limit(240)
+      : db.from('profiles').select('*').order('id', { ascending: false }).limit(60);
+    const { data: peopleRows } = await peoplePoolQ;
     const scoredPeople = (peopleRows || [])
       .map((pr) => {
         const un = (pr.username || '').toLowerCase();
@@ -369,10 +395,27 @@ export default async function handler(req, res) {
       .map((x) => x.pr);
 
     /* ---------- groups: exact + fuzzy ---------- */
-    const { data: groupRows } = await supabase.from('groups').select('*').limit(200);
+    // Same discipline: prefilter by name/description instead of hauling the lot.
+    const groupOrQ = terms.length
+      ? supabase
+          .from('groups')
+          .select('*')
+          .or(
+            terms
+              .slice(0, 3)
+              .flatMap((t) => {
+                const s = t.replace(/[%_,()"\\]/g, '');
+                if (!s) return [];
+                return [`name.ilike.%${s}%`, `description.ilike.%${s}%`];
+              })
+              .join(','),
+          )
+          .limit(120)
+      : db.from('groups').select('*').limit(120);
+    const { data: groupRows } = await groupOrQ;
     let myGroupIds = new Set();
     if (user) {
-      const { data: mem } = await supabase.from('group_members').select('group_id').eq('user_id', user.id);
+      const { data: mem } = await db.from('group_members').select('group_id').eq('user_id', user.id);
       myGroupIds = new Set((mem || []).map((m) => m.group_id));
     }
     const scoredGroups = (groupRows || [])

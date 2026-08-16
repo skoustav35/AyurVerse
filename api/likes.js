@@ -1,8 +1,9 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 import { notify } from './notify.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -23,18 +24,18 @@ export default async function handler(req, res) {
 
     let liked;
     if (existing) {
-      const { error } = await supabase.from('likes').delete().eq('id', existing.id);
+      const { error } = await db.from('likes').delete().eq('id', existing.id);
       if (error) throw error;
       liked = false;
     } else {
-      const { error } = await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
+      const { error } = await db.from('likes').insert({ post_id: postId, user_id: user.id });
       if (error) throw error;
       liked = true;
     }
 
-    const { data: post } = await supabase.from('posts').select('likes_count, tags, kind, author_id, title, caption').eq('id', postId).single();
+    const { data: post } = await db.from('posts').select('likes_count, tags, kind, author_id, title, caption').eq('id', postId).single();
     const next = Math.max(0, (post?.likes_count ?? 0) + (liked ? 1 : -1));
-    await supabase.from('posts').update({ likes_count: next }).eq('id', postId);
+    await db.from('posts').update({ likes_count: next }).eq('id', postId);
 
     if (liked) {
       await supabase

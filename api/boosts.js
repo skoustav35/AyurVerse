@@ -1,4 +1,4 @@
-import supabase from './db-client.js';
+import supabase, { db, enterScope, applyCors } from './db-client.js';
 
 /*
  * Boosts — creators pay to amplify a post or their whole channel.
@@ -22,7 +22,7 @@ async function getAuthUser(req) {
 }
 
 async function followerCount(userId) {
-  const { count } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('followee_id', userId);
+  const { count } = await db.from('follows').select('*', { count: 'exact', head: true }).eq('followee_id', userId);
   return count || 0;
 }
 
@@ -44,7 +44,8 @@ function decorate(b) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  enterScope(req);
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
       // enrich post boosts with a title/thumb, and roll up live counters
       const postIds = [...new Set((rows || []).filter((b) => b.post_id).map((b) => b.post_id))];
       const { data: posts } = postIds.length
-        ? await supabase.from('posts').select('id, title, caption, media_url, media_type, kind, likes_count').in('id', postIds)
+        ? await db.from('posts').select('id, title, caption, media_url, media_type, kind, likes_count').in('id', postIds)
         : { data: [] };
       const postById = new Map((posts || []).map((p) => [p.id, p]));
 
@@ -94,7 +95,7 @@ export default async function handler(req, res) {
 
       if (targetType === 'post') {
         if (!postId) return res.status(400).json({ error: 'Pick a post to boost' });
-        const { data: post } = await supabase.from('posts').select('id, author_id, likes_count').eq('id', postId).maybeSingle();
+        const { data: post } = await db.from('posts').select('id, author_id, likes_count').eq('id', postId).maybeSingle();
         if (!post) return res.status(404).json({ error: 'Post not found' });
         if (post.author_id !== user.id) return res.status(403).json({ error: 'You can only boost your own posts' });
       }
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
       // capture baselines so lift can be measured
       let baseline_likes = 0;
       if (postId) {
-        const { data: post } = await supabase.from('posts').select('likes_count').eq('id', postId).maybeSingle();
+        const { data: post } = await db.from('posts').select('likes_count').eq('id', postId).maybeSingle();
         baseline_likes = post?.likes_count || 0;
       }
       const baseline_followers = await followerCount(user.id);
@@ -125,7 +126,7 @@ export default async function handler(req, res) {
         expires_at: new Date(Date.now() + BOOST_DAYS * 86400000).toISOString(),
       };
 
-      const { data, error } = await supabase.from('boosts').insert(row).select().single();
+      const { data, error } = await db.from('boosts').insert(row).select().single();
       if (error) throw error;
 
       return res.status(201).json({
