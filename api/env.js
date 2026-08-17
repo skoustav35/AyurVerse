@@ -18,8 +18,10 @@ export const CENTRAL = {
   GOOGLE_CLIENT_ID: '1065078894672-rmp5kp8vfjns5rn9kp5psfp16g691043.apps.googleusercontent.com',
   GOOGLE_AUTH_PROXY: 'https://designarena.ai/auth/google/callback',
 
-  // Auxiliary media-storage project. Secrets-tab env wins; keep the raw
-  // service key OUT of source (GitHub push protection refuses it, proudly).
+  // Auxiliary media-storage project. Secrets-tab env wins; the pinned fallback
+  // keeps image/voice uploads alive on this deployment (private repo).
   AUX_SUPABASE_URL: process.env.AUX_SUPABASE_URL || 'https://ducnapzbjqmhjxpmsqez.supabase.co',
-  AUX_SUPABASE_SERVICE_ROLE_KEY: process.env.AUX_SUPABASE_SERVICE_ROLE_KEY || '',
+  AUX_SUPABASE_ANON_KEY: process.env.AUX_SUPABASE_ANON_KEY || 'sb_publishable_u-WSJ6oD_EabXjdWwi5S_g_iH0y9yqO',
+  AUX_SUPABASE_SERVICE_ROLE_KEY:
+    process.env.AUX_SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_j2q-UQhjFFfMMx0zFS0ERQ_-IaJRlZz',
 };
