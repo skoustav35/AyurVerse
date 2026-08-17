@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bookmark, CalendarDays, Camera, LogOut, PencilLine, Sprout, Users, Wand2, Wallet, Sparkles, X, Rocket, Radar } from 'lucide-react';
+import { Bookmark, CalendarDays, Camera, LogOut, PencilLine, Sprout, Users, Wand2, Wallet, Sparkles, X, Rocket, Radar, KeyRound } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '../common/Avatar';
 import Mandala from '../common/Mandala';
@@ -12,6 +12,7 @@ import AnalyticsView from '../studio/AnalyticsView';
 import BoostView from '../studio/BoostView';
 import PayoutsView from '../studio/PayoutsView';
 import SocietyView from '../studio/SocietyView';
+import KeysView from '../studio/KeysView';
 import supabase from '../../lib/supabase';
 import { apiFetch } from '../../lib/api';
 import { uploadMedia } from '../../lib/upload';
@@ -144,7 +145,7 @@ function EditProfileModal({ profile, onClose }: { profile: Profile; onClose: () 
   );
 }
 
-type StudioSub = 'analytics' | 'boost' | 'payouts' | 'society';
+type StudioSub = 'analytics' | 'boost' | 'payouts' | 'society' | 'keys';
 
 export default function ProfileView() {
   const { user } = useAuth();
@@ -428,6 +429,7 @@ function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: Stu
     { id: 'boost', label: 'Boost', icon: Rocket },
     { id: 'payouts', label: 'Payouts', icon: Wallet },
     { id: 'society', label: 'Society', icon: Radar },
+    { id: 'keys', label: 'API Keys', icon: KeyRound },
   ];
   return (
     <div className="mt-5">
@@ -452,6 +454,7 @@ function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: Stu
       {active === 'boost' && <BoostView />}
       {active === 'payouts' && <PayoutsView />}
       {active === 'society' && <SocietyView />}
+      {active === 'keys' && <KeysView />}
     </div>
   );
 }

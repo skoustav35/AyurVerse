@@ -1,4 +1,4 @@
-import supabase, { db, enterScope, applyCors } from './db-client.js';
+import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js';
 import mediaBucket from './storage-client.js';
 
 const DEFAULT_PAGE = 8;
@@ -6,7 +6,7 @@ const DEFAULT_PAGE = 8;
 async function getAuthUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return null;
-  const { data: { user } } = await supabase.auth.getUser(token);
+  const { data: { user } } = await resolveUser(req);
   return user || null;
 }
 

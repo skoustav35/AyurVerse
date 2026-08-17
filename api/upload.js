@@ -1,52 +1,50 @@
-import supabase, { db, enterScope, applyCors } from './db-client.js';
-import mediaBucket from './storage-client.js';
+import supabase, { enterScope, applyCors, resolveUser } from './db-client.js';
+import { blobInsert } from './blob-store.js';
 
+/*
+ * Uploads, the rotation-proof way. No storage service-key stands in the path:
+ * images (canvas-flattened by the client to friendly JPEGs) and short media are
+ * written to the aux vault table; the public read lane is /api/media?id=…
+ * with immutable caching. The signed-URL lane is retired on this deployment —
+ * the client falls through to this lane automatically, preserving its progress
+ * callbacks.
+ */
 export default async function handler(req, res) {
   enterScope(req);
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    const { data: { user }, error: authError } = await resolveUser(req);
+    if (authError || !user) return res.status(401).json({ error: 'Sign in to upload' });
 
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: 'Sign in to upload' });
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) return res.status(401).json({ error: 'Invalid session' });
-
+    // legacy/large lane off-ramp: tell the client to use base64 directly
     if (req.body?.direct) {
-      const fileName0 = String(req.body.fileName || 'file');
-      const safeName0 = fileName0.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-80);
-      const path0 = `${user.id}/${Date.now()}-${safeName0}`;
-      const { data: signed, error: sErr } = await mediaBucket.createSignedUploadUrl(path0);
-      if (sErr) throw sErr;
-      const { data: pub } = mediaBucket.getPublicUrl(path0);
-      const signedUrl = (signed.signedUrl || '').replace(
-        /^https:\/\/([^.]+)\.supabase\.(co|in|red)\/storage\/v1/,
-        'https://$1.storage.supabase.$2/storage/v1',
-      );
-      return res.status(200).json({ path: path0, token: signed.token, signedUrl: signedUrl || signed.signedUrl, publicUrl: pub.publicUrl });
+      return res.status(200).json({ useLegacy: true });
     }
 
     const { fileName, fileBase64, contentType } = req.body || {};
-    if (!fileName || !fileBase64) return res.status(400).json({ error: 'fileName and fileBase64 required' });
+    if (!fileBase64) return res.status(400).json({ error: 'fileBase64 required' });
 
-    const approxBytes = Math.floor(fileBase64.length * 0.75);
-    if (approxBytes > 14 * 1024 * 1024) return res.status(413).json({ error: 'File too large (max 14MB)' });
+    const approxBytes = Math.floor(String(fileBase64).length * 0.75);
+    if (approxBytes > 3.8 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Keep artifacts under ~3.5MB for now — the vault is careful porcelain, not a freight yard.' });
+    }
+    const type = /^[a-z0-9-]+\/[a-z0-9.+-]+$/i.test(String(contentType || ''))
+      ? String(contentType)
+      : 'image/jpeg';
 
-    const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-80);
-    const path = `${user.id}/${Date.now()}-${safeName}`;
-    const buffer = Buffer.from(fileBase64, 'base64');
-
-    const { error } = await mediaBucket.upload(path, buffer, { contentType: contentType || 'application/octet-stream', upsert: true });
+    const { data, error } = await blobInsert(user.id, String(fileBase64), type);
     if (error) throw error;
 
-    const { data: urlData } = mediaBucket.getPublicUrl(path);
-    return res.status(200).json({ url: urlData.publicUrl });
+    const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    return res.status(200).json({ url: `${proto}://${host}/api/media?id=${data.id}` });
   } catch (err) {
     console.error('upload error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Server error' });
   }
 }

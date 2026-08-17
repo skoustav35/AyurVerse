@@ -1,4 +1,4 @@
-import supabase, { db, enterScope, applyCors } from './db-client.js';
+import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js';
 
 /*
  * Explore — the discovery engine behind the Library tab.
@@ -10,7 +10,7 @@ import supabase, { db, enterScope, applyCors } from './db-client.js';
 async function getAuthUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return null;
-  const { data: { user } } = await supabase.auth.getUser(token);
+  const { data: { user } } = await resolveUser(req);
   return user || null;
 }
 

@@ -1,4 +1,4 @@
-import supabase, { db, enterScope, applyCors } from './db-client.js';
+import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js';
 
 /*
  * Boost CTR engine. The feed fires impressions when a boosted card is seen,
@@ -15,7 +15,7 @@ const EVENTS = new Set(['impression', 'click', 'like', 'follow']);
 async function getAuthUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return null;
-  const { data: { user } } = await supabase.auth.getUser(token);
+  const { data: { user } } = await resolveUser(req);
   return user || null;
 }
 

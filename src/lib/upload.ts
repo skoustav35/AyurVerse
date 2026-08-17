@@ -87,12 +87,13 @@ function xhrPutWithProgress(url: string, file: File, onProgress?: ProgressFn): P
 }
 
 async function signedLane(file: File, onProgress?: ProgressFn): Promise<string> {
-  const lane = await apiFetch<{ signedUrl: string; publicUrl: string }>('/api/upload', {
+  const lane = await apiFetch<{ signedUrl?: string; publicUrl?: string; useLegacy?: boolean }>('/api/upload', {
     method: 'POST',
     body: JSON.stringify({ direct: true, fileName: file.name, contentType: file.type }),
   });
+  if (lane.useLegacy || !lane.signedUrl) throw new Error('lane says: take the parchment road');
   await xhrPutWithProgress(lane.signedUrl, file, onProgress);
-  return lane.publicUrl;
+  return lane.publicUrl as string;
 }
 
 async function legacyLane(file: File): Promise<string> {

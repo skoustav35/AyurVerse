@@ -1,4 +1,4 @@
-import supabase, { db, enterScope, applyCors } from './db-client.js';
+import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js';
 
 /*
  * Record a notification for `recipientId` caused by `actor` (a Supabase user).

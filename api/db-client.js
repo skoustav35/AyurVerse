@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { triggerRestore } from './db-wake.js';
 import { CENTRAL } from './env.js';
 
+const AUX_REF = 'ducnapzbjqmhjxpmsqez';
+
 /*
  * db-client — identity-forwarding data access.
  *
@@ -81,7 +83,10 @@ const als = new AsyncLocalStorage();
 export function enterScope(req) {
   const auth = req?.headers?.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  const client = token ? clientForToken(token) : anonClient;
+  // Bearer 'av_live_…' is an app key, not a JWT — PostgREST must never see it
+  // as one. PATs ride the anonymous data plane; identity lives in resolveUser.
+  const looksJwt = !!token && token.split('.').length === 3;
+  const client = looksJwt ? clientForToken(token) : anonClient;
   als.enterWith({ client, token });
 }
 
@@ -129,4 +134,66 @@ export function applyCors(req, res) {
 
 /* The original default export stays available for auth-only calls. */
 const supabase = anonClient;
+
+/**
+ * resolveUser(req) — the ONE door identity walks through.
+ * Accepts a Supabase session Bearer OR a personal access key
+ * `av_live_…` minted from You → Studio → API Keys. Returns the exact
+ * shape of supabase.auth.getUser() so every route keeps its cadence.
+ * Key vault lives on the healthy AUX project (RLS-locked there).
+ */
+const AUX_URL = CENTRAL.AUX_SUPABASE_URL || process.env.AUX_SUPABASE_URL;
+// Publishable by design: service keys in this stack rotate out of registration;
+// the vault table only ever holds SHA-256 fingerprints.
+const AUX_KEY =
+  process.env.AUX_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'sb_publishable_u-WSJ6oD_EabXjdWwi5S_g_iH0y9yqO';
+const keyVault = AUX_URL && AUX_KEY ? createClient(AUX_URL, AUX_KEY, { auth: { persistSession: false } }) : null;
+
+const _lastUsedWrites = new Map();
+function touchLastUsed(id) {
+  const last = _lastUsedWrites.get(id) || 0;
+  if (Date.now() - last < 60_000) return;
+  _lastUsedWrites.set(id, Date.now());
+  if (_lastUsedWrites.size > 5000) _lastUsedWrites.clear();
+  if (keyVault) {
+    keyVault.from('api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', id).then(() => {});
+  }
+}
+
+export async function resolveUser(req) {
+  const auth = req?.headers?.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!token) return { data: { user: null }, error: null };
+  if (token.startsWith('av_live_')) {
+    if (!keyVault) return { data: { user: null }, error: { message: 'key vault not configured' } };
+    const { createHash } = await import('node:crypto');
+    const hash = createHash('sha256').update(token).digest('hex');
+    const { data: rows, error } = await keyVault
+      .from('api_tokens')
+      .select('id, user_id, prefix, revoked_at')
+      .eq('token_hash', hash)
+      .limit(1);
+    if (error && /Unregistered|Invalid API key/i.test(error.message || '')) triggerRestore(AUX_REF);
+    const row = rows?.[0];
+    if (error || !row || row.revoked_at) return { data: { user: null }, error: error || { message: 'invalid or revoked access key' } };
+    touchLastUsed(row.id);
+    return {
+      data: {
+        user: {
+          id: row.user_id,
+          aud: 'authenticated',
+          role: 'authenticated',
+          email: `access-key:${row.prefix}`,
+          user_metadata: {},
+          pat: row.prefix,
+        },
+      },
+      error: null,
+    };
+  }
+  return supabase.auth.getUser(token);
+}
+
 export default supabase;

@@ -1,4 +1,4 @@
-import supabase, { db, enterScope, applyCors } from './db-client.js';
+import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js';
 import { chat, hasKey } from './opencode.js';
 
 /*
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.status(401).json({ error: 'Sign in to summon the scribe' });
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await resolveUser(req);
     if (authError || !user) return res.status(401).json({ error: 'Invalid session' });
 
     if (!hasKey()) return res.status(503).json({ error: 'The scribe is not configured \u2014 set OPENCODE_API_KEY in .env' });
