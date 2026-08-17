@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bookmark, CalendarDays, Camera, LogOut, PencilLine, Sprout, Users, Wand2, Wallet, Sparkles, X, Rocket, Radar, KeyRound } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -322,6 +322,8 @@ export default function ProfileView() {
           </div>
         </div>
 
+        {/* the content beneath the rail turns like a page, never a hard swap */}
+        <SectionSwitch k={subTab}>
         {subTab === 'apothecary' ? (
           <SavedPanel />
         ) : subTab === 'studio' ? (
@@ -357,28 +359,33 @@ export default function ProfileView() {
                     <div key={i} className="skeleton aspect-square !rounded-xl" />
                   ))}
                 </div>
-              ) : segment === 'media' ? (
-                media.length === 0 ? (
-                  <EmptyWeave onWeave={() => setComposerOpen(true)} label="Weave your first visual post" />
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    {media.map((p) => (
-                      <ImageTile key={p.id} post={p} />
-                    ))}
-                  </div>
-                )
-              ) : lore.length === 0 ? (
-                <EmptyWeave onWeave={() => setComposerOpen(true)} label="Compose your first scroll" />
               ) : (
-                <div className="space-y-2.5">
-                  {lore.map((p) => (
-                    <ForgeRow key={p.id} post={p} q="" />
-                  ))}
-                </div>
+                <SectionSwitch k={segment}>
+                  {segment === 'media' ? (
+                    media.length === 0 ? (
+                      <EmptyWeave onWeave={() => setComposerOpen(true)} label="Weave your first visual post" />
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2">
+                        {media.map((p) => (
+                          <ImageTile key={p.id} post={p} />
+                        ))}
+                      </div>
+                    )
+                  ) : lore.length === 0 ? (
+                    <EmptyWeave onWeave={() => setComposerOpen(true)} label="Compose your first scroll" />
+                  ) : (
+                    <div className="space-y-2.5">
+                      {lore.map((p) => (
+                        <ForgeRow key={p.id} post={p} q="" />
+                      ))}
+                    </div>
+                  )}
+                </SectionSwitch>
               )}
             </div>
           </div>
         )}
+        </SectionSwitch>
       </div>
 
       <AnimatePresence>{editing && profile && <EditProfileModal profile={profile} onClose={() => setEditing(false)} />}</AnimatePresence>
@@ -423,6 +430,24 @@ export default function ProfileView() {
   );
 }
 
+/** Turns page-like on every tab/segment change: lift + settle, mode-wait so the
+ *  departing page curtseys fully before its successor speaks. */
+function SectionSwitch({ k, children }: { k: string; children: ReactNode }) {
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={k}
+        initial={{ opacity: 0, y: 16, scale: 0.992 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -9, scale: 0.996 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: StudioSub) => void }) {
   const tabs: { id: StudioSub; label: string; icon: typeof Wand2 }[] = [
     { id: 'analytics', label: 'Analytics', icon: Wand2 },
@@ -435,8 +460,9 @@ function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: Stu
     <div className="mt-5">
       <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-sand-300 bg-parchment p-1 text-[11.5px] font-semibold">
         {tabs.map((t) => (
-          <button
+          <motion.button
             key={t.id}
+            whileTap={{ scale: 0.96 }}
             onClick={() => onChange(t.id)}
             className={`relative flex-1 justify-center px-3 py-2 rounded-xl transition-colors flex items-center gap-1.5 ${
               active === t.id ? 'text-parchment' : 'text-ink-600 hover:text-neem-800'
@@ -447,14 +473,16 @@ function StudioView({ active, onChange }: { active: StudioSub; onChange: (s: Stu
             )}
             <t.icon size={13} className="relative z-10" />
             <span className="relative z-10">{t.label}</span>
-          </button>
+          </motion.button>
         ))}
       </div>
-      {active === 'analytics' && <AnalyticsView />}
-      {active === 'boost' && <BoostView />}
-      {active === 'payouts' && <PayoutsView />}
-      {active === 'society' && <SocietyView />}
-      {active === 'keys' && <KeysView />}
+      <SectionSwitch k={active}>
+        {active === 'analytics' && <AnalyticsView />}
+        {active === 'boost' && <BoostView />}
+        {active === 'payouts' && <PayoutsView />}
+        {active === 'society' && <SocietyView />}
+        {active === 'keys' && <KeysView />}
+      </SectionSwitch>
     </div>
   );
 }

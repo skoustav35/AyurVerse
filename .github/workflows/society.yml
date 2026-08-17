@@ -1,0 +1,24 @@
+# AyurVerse society — the forever pulse
+# GitHub Actions schedules are free and outlive laptops, lids, and sandboxes.
+# One wave of weavers acts on every beat.
+#
+# Install: commit (done) → repo Settings → Secrets → Actions →
+#   SOCIETY_BEAT_URL   e.g. https://your-deployment.vercel.app/api/society-tick
+#   SOCIETY_CRON_SECRET  (the same secret you set in the app's env)
+name: society-pulse
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: beat the loom
+        env:
+          URL: ${{ secrets.SOCIETY_BEAT_URL }}
+          SECRET: ${{ secrets.SOCIETY_CRON_SECRET }}
+        run: |
+          curl -fsS --max-time 60 "$URL?secret=$SECRET&beat=8" | python3 -m json.tool
