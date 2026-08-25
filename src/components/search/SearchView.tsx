@@ -24,11 +24,13 @@ const FILTERS: { id: Filter; label: string; icon: typeof Search }[] = [
 ];
 
 interface SearchMeta {
-  terms: number;
-  ranked: number;
+  terms: number | string[];
+  ranked?: number;
   matchQuality: 'exact' | 'close' | 'suggested' | 'discovery';
   suggestion: string | null;
   query?: string;
+  engine?: string;
+  ms?: number;
 }
 
 interface SearchResponse {
@@ -103,7 +105,14 @@ export default function SearchView() {
   return (
     <div className="w-full max-w-[760px] mx-auto px-4 pt-4 lg:pt-8 pb-14">
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-saffron-700">The Library</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-saffron-700 flex items-center gap-2">
+          The Library
+          {data?.meta?.engine && (
+            <span className="normal-case tracking-normal text-[9.5px] font-bold text-gold-700 bg-gold-400/15 border border-gold-400/50 rounded-full px-2 py-0.5">
+              {data.meta.engine}
+            </span>
+          )}
+        </p>
         <h1 className="font-display text-[26px] lg:text-[32px] font-semibold text-ink-900 mt-1">
           Ask, and the atelier answers
         </h1>

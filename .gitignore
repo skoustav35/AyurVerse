@@ -38,3 +38,10 @@ _sutra_backup/
 
 __pycache__/
 uploads/
+
+# vendored api-only supabase copy (sandbox-local fallback resolution)
+api/node_modules/
+.vercelignore.tmp
+
+# sandbox-only vendor tree (never ship: Vercel installs from the lockfile)
+vendor/

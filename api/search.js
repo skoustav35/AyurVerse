@@ -1,119 +1,48 @@
 import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js';
+import { parseQuery, tokens } from './lib/unicorn.js';
+import { gatherCandidates, textEvidence, bestFuzzyInText } from './lib/earlybird.js';
+import { heavyScore } from './lib/heavyrank.js';
+import { productRules, tierOf } from './lib/productrules.js';
 
-/* ------------------------------------------------------------------ *
- *  AyurVerse Library search — fuzzy, forgiving, never-empty.
+/* =====================================================================
+ *  The Library engine, rebuilt as a port of the open "the-algorithm"
+ *  search stack:
+ *      unicorn    query understanding (operators, terms, phrase, stems)
+ *      earlybird  parallel bounded candidate pools (field / tag / operator
+ *                 / recency), each carrying Lucene-ish field evidence
+ *      heavyrank  weighted engagement + social edge + taste spectrum +
+ *                 freshness decay + author authority, floors included
+ *      heuristics author-diversity braid, kind mixing, trust tiers
  *
- *  Pipeline:
- *   1. tokenize + normalize (light stemmer)         → base terms
- *   2. expand with a domain lexicon (synonyms)       → expanded terms
- *   3. score every post with a BM25-style field mix  → text score
- *        + fuzzy partial credit (typos / near-miss)
- *        + phrase & proximity bonuses
- *        + term-coverage boost
- *   4. re-rank with engagement · freshness · taste
- *   5. relaxation cascade so results are NEVER empty:
- *        exact → close (fuzzy/synonym) → suggested (loose/popular)
- *   6. return matchQuality + a "did you mean" suggestion
- * ------------------------------------------------------------------ */
+ *  Product contract kept: results NEVER come back empty (the answer
+ *  replies with its hands open — exact → close → suggested), people and
+ *  circles answer alongside posts, and meta explains itself.
+ * ===================================================================== */
 
-const STOP = new Set([
-  'the', 'a', 'an', 'of', 'to', 'in', 'on', 'and', 'or', 'for', 'with', 'is', 'are',
-  'at', 'by', 'from', 'that', 'this', 'it', 'as', 'be', 'was', 'were', 'my', 'me',
-]);
-
-// domain lexicon — each key expands to related terms (bidirectional at build time)
 const LEXICON_RAW = {
-  poetry: ['poem', 'poems', 'verse', 'verses', 'recitation', 'kobita', 'shayari', 'sonnet'],
-  video: ['reel', 'reels', 'clip', 'film', 'movie', 'footage'],
-  image: ['photo', 'photos', 'photograph', 'picture', 'pic', 'still', 'snapshot'],
-  yoga: ['asana', 'asanas', 'pranayama', 'sadhana', 'meditation', 'stretch'],
-  ayurveda: ['ayurvedic', 'herb', 'herbs', 'herbal', 'dosha', 'doshas', 'wellness', 'remedy', 'tonic'],
-  river: ['ghat', 'ghats', 'ganga', 'ganges', 'water', 'stream'],
-  dance: ['kathak', 'chakkar', 'chakkars', 'ghungroo', 'performance', 'nritya'],
-  food: ['chai', 'spice', 'spices', 'recipe', 'cooking', 'streetfood', 'rasa', 'cuisine'],
-  code: ['coding', 'programming', 'software', 'developer', 'dev', 'algorithm', 'python', 'javascript'],
-  math: ['mathematics', 'equation', 'equations', 'theorem', 'calculus', 'algebra', 'euler'],
-  temple: ['shrine', 'mandir', 'aarti', 'ritual', 'puja', 'prayer'],
-  mountain: ['mountains', 'himalaya', 'himalayas', 'peak', 'hill', 'hills'],
-  rain: ['monsoon', 'storm', 'showers', 'downpour'],
-  festival: ['diwali', 'holi', 'celebration', 'diya', 'diyas', 'lights'],
-  ai: ['ml', 'model', 'models', 'transformer', 'transformers', 'neural', 'llm'],
+  poetry: ['poem', 'poems', 'verse', 'verses', 'recitation', 'kobita', 'shayari'],
+  video: ['reel', 'reels', 'clip', 'film', 'footage'],
+  image: ['photo', 'photos', 'photograph', 'picture', 'pic', 'still'],
+  yoga: ['asana', 'pranayama', 'sadhana', 'meditation', 'stretch'],
+  ayurveda: ['ayurvedic', 'herb', 'herbs', 'dosha', 'wellness', 'remedy'],
+  river: ['ghat', 'ghats', 'ganga', 'water'],
+  dance: ['kathak', 'ghungroo', 'performance', 'bharatanatyam'],
+  food: ['chai', 'spice', 'spices', 'recipe', 'cooking', 'streetfood'],
+  code: ['python', 'javascript', 'software', 'algorithm', 'developer'],
+  math: ['mathematics', 'equation', 'theorem', 'calculus', 'algebra'],
+  ai: ['ml', 'transformer', 'transformers', 'neural', 'llm', 'model'],
+  rain: ['monsoon', 'storm', 'downpour'],
+  temple: ['shrine', 'mandir', 'puja', 'prayer'],
 };
 
-// build a flat expansion map both directions
 const LEXICON = new Map();
-function link(a, b) {
-  if (!LEXICON.has(a)) LEXICON.set(a, new Set());
-  LEXICON.get(a).add(b);
-}
-for (const [key, arr] of Object.entries(LEXICON_RAW)) {
+const lexLink = (a, b) => { if (!LEXICON.has(a)) LEXICON.set(a, new Set()); LEXICON.get(a).add(b); };
+for (const [k, arr] of Object.entries(LEXICON_RAW)) {
   for (const w of arr) {
-    link(key, w);
-    link(w, key);
-    for (const w2 of arr) if (w2 !== w) link(w, w2);
+    lexLink(k, w);
+    lexLink(w, k);
+    for (const w2 of arr) if (w2 !== w) lexLink(w, w2);
   }
-}
-
-const tokens = (q) => (q || '').toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
-
-// very light stemmer — strips common English suffixes to a stable base
-function stem(w) {
-  let s = w;
-  s = s.replace(/(ies)$/,'y');
-  s = s.replace(/(sses)$/,'ss');
-  s = s.replace(/(ing|edly|ed|ly|es|s)$/,'');
-  if (s.length < 2) return w;
-  return s;
-}
-
-/* -------- fuzzy string similarity (Levenshtein → 0..1) -------- */
-function levenshtein(a, b) {
-  if (a === b) return 0;
-  const m = a.length, n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  let prev = new Array(n + 1);
-  let cur = new Array(n + 1);
-  for (let j = 0; j <= n; j++) prev[j] = j;
-  for (let i = 1; i <= m; i++) {
-    cur[0] = i;
-    const ai = a.charCodeAt(i - 1);
-    for (let j = 1; j <= n; j++) {
-      const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-    }
-    [prev, cur] = [cur, prev];
-  }
-  return prev[n];
-}
-
-function similarity(a, b) {
-  if (!a || !b) return 0;
-  const dist = levenshtein(a, b);
-  return 1 - dist / Math.max(a.length, b.length);
-}
-
-// best fuzzy match of `term` against the words already present in a text blob
-function bestFuzzyInText(term, words) {
-  let best = 0;
-  for (const w of words) {
-    if (Math.abs(w.length - term.length) > 3) continue; // cheap length gate
-    const s = similarity(term, w);
-    if (s > best) best = s;
-    if (best === 1) break;
-  }
-  return best;
-}
-
-function tfCount(text, term) {
-  if (!text) return 0;
-  let c = 0;
-  let i = 0;
-  while ((i = text.indexOf(term, i)) !== -1) {
-    c++;
-    i += term.length;
-  }
-  return c;
 }
 
 async function getAuthUser(req) {
@@ -123,149 +52,55 @@ async function getAuthUser(req) {
   return user || null;
 }
 
-// build the searchable field set for a post, with per-field weights
-function fieldsOf(p) {
-  return [
-    [(p.title || '').toLowerCase(), 6.0],
-    [(p.tags || []).join(' ').toLowerCase(), 5.5],
-    [(p.summary || '').toLowerCase(), 3.0],
-    [(p.caption || '').toLowerCase(), 2.6],
-    [`${p.author_name || ''} ${p.author_username || ''}`.toLowerCase(), 2.2],
-    [(p.location || '').toLowerCase(), 1.6],
-    [(p.content_md || '').slice(0, 6000).toLowerCase(), 1.0],
-  ];
-}
-
-/*
- * Score one post against the query.
- * Returns { text, coverage, fuzzy, exactHits } so the caller can decide
- * which relaxation stage a result belongs to.
- */
-function scorePost(p, ctx) {
-  const { terms, stems, expanded, phrase } = ctx;
-  const fields = fieldsOf(p);
-  const blob = fields.map((f) => f[0]).join(' ');
-  const words = blob.match(/[\p{L}\p{N}]{2,}/gu) || [];
-
-  let text = 0;
-  let exactHits = 0;
-  let fuzzyCredit = 0;
-  const covered = new Set();
-
-  terms.forEach((term, idx) => {
-    const st = stems[idx];
-    let best = 0;
-    let sum = 0;
-    let hitExact = false;
-
-    for (const [txt, w] of fields) {
-      // exact / substring term frequency (saturating)
-      const tf = tfCount(txt, term) + (st !== term ? tfCount(txt, st) : 0);
-      if (tf > 0) {
-        hitExact = true;
-        const contrib = w * (tf / (tf + 1.2));
-        sum += contrib;
-        if (contrib > best) best = contrib;
-      }
-    }
-
-    if (hitExact) {
-      exactHits++;
-      covered.add(idx);
-      text += best + 0.35 * (sum - best);
-    } else {
-      // no exact hit — try fuzzy against the post's own vocabulary
-      const fz = Math.max(bestFuzzyInText(term, words), bestFuzzyInText(st, words));
-      if (fz >= 0.72) {
-        covered.add(idx);
-        fuzzyCredit += fz * 3.4; // near-miss / typo partial credit
-      }
-    }
-  });
-
-  // synonym / related-term expansion credit (weaker than a real hit)
-  let synCredit = 0;
-  for (const syn of expanded) {
-    if (blob.includes(syn)) synCredit += 1.4;
-  }
-
-  // exact-phrase & field bonuses
-  let bonus = 0;
-  if (phrase.length >= 3) {
-    if (fields[0][0].includes(phrase)) bonus += 9;
-    if (fields[1][0].includes(phrase)) bonus += 6;
-    if (fields[2][0].includes(phrase) || fields[3][0].includes(phrase)) bonus += 4;
-    if (fields[6][0].includes(phrase)) bonus += 2;
-  }
-
-  // term-coverage boost — reward results that touch more of the query
-  const coverage = terms.length ? covered.size / terms.length : 0;
-  const coverageBoost = coverage * 4.5;
-
-  return {
-    text,
-    fuzzy: fuzzyCredit,
-    syn: synCredit,
-    bonus,
-    coverage,
-    exactHits,
-    combined: text * 3 + fuzzyCredit + synCredit + bonus + coverageBoost,
-  };
-}
-
 export default async function handler(req, res) {
   enterScope(req);
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  // anonymized reads cacheable at the edge; authed reads carry personal edges
+  res.setHeader(
+    'Cache-Control',
+    req.headers.authorization ? 'private, no-store' : 'public, s-maxage=15, stale-while-revalidate=30',
+  );
+
+  const started = Date.now();
 
   try {
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
-    // Edge caching: anonymous reads are shared across the CDN; authed reads
-    // carry personal flags (liked/saved), so they stay private and uncached.
-    res.setHeader(
-      'Cache-Control',
-      req.headers.authorization ? 'private, no-store' : 'public, s-maxage=15, stale-while-revalidate=30'
-    );
-
-    const raw = String(req.query.q || '').trim();
-    const kind = req.query.kind ? String(req.query.kind) : null;
-
+    const qRaw = String(req.query.q || '').trim();
+    const kindQ = req.query.kind ? String(req.query.kind) : null; // forge | visual | video | image
     const user = await getAuthUser(req);
 
-    // fetch the candidate pool once
-    const { data: posts, error } = await supabase
-      .from('posts')
-      .select('*')
-      .order('id', { ascending: false })
-      .limit(600);
-    if (error) throw error;
+    /* -------------------- unicorn · understand the ask -------------------- */
+    const plan = parseQuery(qRaw);
+    const kindFilter =
+      plan.ops.kind === 'forge' ? 'forge'
+        : plan.ops.kind === 'visual' ? 'visual'
+        : null; // video/image narrow media_type later
 
-    const kindFilter = (p) => {
-      if (kind === 'forge') return p.kind === 'forge';
-      if (kind === 'video') return p.media_type === 'video';
-      if (kind === 'image') return p.media_type === 'image';
+    const mediaFilter = (p) => {
+      if (plan.ops.kind === 'video') return p.media_type === 'video';
+      if (plan.ops.kind === 'image') return p.media_type === 'image';
       return true;
     };
-    const pool = (posts || []).filter(kindFilter);
 
-    // empty query → curated discovery (popular + fresh), never an error
-    if (!raw) {
+    /* -------------------- discovery landing: no ask at all -------------------- */
+    if (!qRaw) {
+      const { data: recent } = await db.from('posts').select('*').order('id', { ascending: false }).limit(120);
       const now = Date.now();
-      const disco = [...pool]
-        .map((p) => {
-          const ageDays = (now - new Date(p.created_at).getTime()) / 86400000;
-          const score =
-            Math.log1p(p.likes_count || 0) * 1.2 +
-            Math.log1p(p.views_count || 0) +
-            2.2 * Math.exp((-Math.LN2 * ageDays) / 20);
-          return { p, score };
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 30)
-        .map((s) => s.p);
+      const ctx = { now, viewerFollows: new Set(), taste: {}, authorPostCount: new Map(), ops: {} };
+      const disco = productRules(
+        (recent || [])
+          .map((p) => {
+            const evidence = { text: 0, fuzzy: 0, bonus: 0, coverage: 0, exactHits: 0 };
+            const { score, features } = heavyScore({ p, pool: 'discovery', evidence }, { ...ctx, ops: {} });
+            return { p, evidence, score, ...features };
+          })
+          .sort((a, b) => b.score - a.score),
+      ).slice(0, 30);
+
       const { data: peopleRows } = await db.from('profiles').select('*').limit(8);
       const { data: discoGroups } = await db.from('groups').select('*').order('member_count', { ascending: false }).limit(8);
       let myG = new Set();
@@ -274,102 +109,88 @@ export default async function handler(req, res) {
         myG = new Set((mem || []).map((m) => m.group_id));
       }
       return res.status(200).json({
-        posts: disco,
+        posts: disco.map((r) => r.p),
         people: peopleRows || [],
         groups: (discoGroups || []).map((g) => ({ ...g, is_member: myG.has(g.id) })),
-        meta: { terms: 0, ranked: disco.length, matchQuality: 'discovery', suggestion: null },
+        meta: {
+          engine: 'unicorn+earlybird+heavyrank@1.0',
+          stages: { candidates: (recent || []).length, served: disco.length },
+          terms: [],
+          matchQuality: 'discovery',
+          ms: Date.now() - started,
+        },
       });
     }
 
-    /* ---------- prepare query ---------- */
-    const rawTerms = tokens(raw).filter((t) => !STOP.has(t)).slice(0, 12);
-    const terms = rawTerms.length ? rawTerms : tokens(raw).slice(0, 12);
-    const stems = terms.map(stem);
-    const phrase = raw.toLowerCase();
+    /* -------------------- earlybird · walk the posting lists -------------------- */
+    const candidates = await gatherCandidates({ terms: plan.terms, stems: plan.stems, phrase: plan.phrase, ops: plan.ops }, kindFilter);
+    const mediaFiltered = candidates.filter(({ p }) => mediaFilter(p));
 
-    // synonym expansion set (from lexicon on both raw + stem)
-    const expanded = new Set();
-    for (const t of [...terms, ...stems]) {
-      const set = LEXICON.get(t);
-      if (set) for (const s of set) expanded.add(s);
+    // operator semantics are HARD (Twitter's from:/# obey, never negotiate):
+    // typing @aarav or #holi constrains the answer to that author / that tag.
+    let pool = mediaFiltered;
+    let constrained = false;
+    if (plan.ops.author) {
+      const narrowed = mediaFiltered.filter(({ p }) =>
+        (p.author_username || '').toLowerCase().includes(plan.ops.author.toLowerCase()) ||
+        (p.author_name || '').toLowerCase().includes(plan.ops.author.toLowerCase()));
+      if (narrowed.length) { pool = narrowed; constrained = true; }
+    }
+    if (plan.ops.tag) {
+      const narrowed = pool.filter(({ p }) => (p.tags || []).map((t) => String(t).toLowerCase()).includes(plan.ops.tag));
+      if (narrowed.length) { pool = narrowed; constrained = true; }
     }
 
-    // light personal taste weights
-    const tagW = {};
+    // viewer context for the heavy ranker — the social graph edge, and the
+    // taste spectrum (our SimClusters-lite: recent signal tags by affinity)
+    let viewerFollows = new Set();
+    let taste = {};
     if (user) {
-      const { data: sig } = await supabase
-        .from('signals').select('tags, created_at').eq('user_id', user.id)
-        .order('id', { ascending: false }).limit(200);
-      (sig || []).forEach((s) => (s.tags || []).forEach((t) => { tagW[t] = (tagW[t] || 0) + 1; }));
+      const [{ data: fol }, { data: sig }] = await Promise.all([
+        db.from('follows').select('followee_id').eq('follower_id', user.id).limit(500),
+        db.from('signals').select('tags').eq('user_id', user.id).order('id', { ascending: false }).limit(220),
+      ]);
+      viewerFollows = new Set((fol || []).map((r) => r.followee_id));
+      (sig || []).forEach((s) => (s.tags || []).forEach((t) => { taste[t] = (taste[t] || 0) + 1; }));
     }
+    const authorPostCount = new Map();
+    for (const { p } of pool) authorPostCount.set(p.author_id, (authorPostCount.get(p.author_id) || 0) + 1);
 
-    const ctx = { terms, stems, expanded, phrase };
-    const now = Date.now();
-
-    const scored = pool.map((p) => {
-      const s = scorePost(p, ctx);
-      const ageDays = (now - new Date(p.created_at).getTime()) / 86400000;
-      const engage = (1.3 * Math.log1p(p.views_count || 0)) / 10 + (0.9 * Math.log1p(p.likes_count || 0)) / 9;
-      const fresh = 0.9 * Math.exp((-Math.LN2 * ageDays) / 17);
-      let perso = 0;
-      for (const tg of p.tags || []) perso += (tagW[tg] || 0) * 0.5;
-      const finalScore = s.combined + engage + fresh + perso;
-      return { p, s, finalScore };
+    /* -------------------- heavyrank · the neural bargain -------------------- */
+    const ctx = { ...plan, now: Date.now(), viewerFollows, taste, authorPostCount };
+    const scored = pool.map((cand) => {
+      const evidence = textEvidence(cand.p, ctx);
+      const { score, features } = heavyScore({ ...cand, evidence }, ctx);
+      return { p: cand.p, evidence, score, features, tier: tierOf({ ...cand, evidence }) };
     });
 
-    /* ---------- relaxation cascade — never empty ---------- */
-    // Stage 1 · strong: at least one exact term hit or a real phrase bonus
-    let bucket = scored.filter((r) => r.s.exactHits > 0 || r.s.bonus > 0);
-    let matchQuality = 'exact';
-
-    // Stage 2 · close: fuzzy typo / synonym matches
-    if (bucket.length === 0) {
-      bucket = scored.filter((r) => r.s.fuzzy > 0 || r.s.syn > 0);
-      matchQuality = 'close';
+    /* -------------------- heuristics · braid, cap, never-empty -------------------- */
+    let tierUsed = null;
+    let bucket = scored.filter((r) => r.tier === 'exact');
+    if (bucket.length) tierUsed = 'exact';
+    if (!bucket.length) {
+      bucket = scored.filter((r) => r.tier === 'close');
+      tierUsed = bucket.length ? 'close' : tierUsed;
+    }
+    if (!bucket.length) {
+      bucket = scored;
+      tierUsed = 'suggested';
     }
 
-    // Stage 3 · suggested: anything with any positive signal at all
-    if (bucket.length === 0) {
-      bucket = scored.filter((r) => r.finalScore > 0.5);
-      matchQuality = 'suggested';
-    }
+    const termSet = new Set(plan.terms);
 
-    // Stage 4 · safety net: closest-by-popularity so we always answer
-    if (bucket.length === 0) {
-      bucket = scored
-        .map((r) => ({
-          ...r,
-          finalScore:
-            Math.log1p(r.p.likes_count || 0) +
-            Math.log1p(r.p.views_count || 0) +
-            2 * Math.exp((-Math.LN2 * ((now - new Date(r.p.created_at).getTime()) / 86400000)) / 20),
-        }));
-      matchQuality = 'suggested';
-    }
+    bucket.sort((a, b) => b.score - a.score || b.p.id - a.p.id);
+    const braided = productRules(bucket);
+    const top = braided.slice(0, 30);
 
-    bucket.sort((a, b) => b.finalScore - a.finalScore || b.p.id - a.p.id);
-    const items = bucket.slice(0, 30).map((r) => r.p);
+    /* -------------------- people & circles answer too -------------------- */
+    const safe = (s) => String(s || '').replace(/[%_,()"\\]/g, '').trim();
+    const peopleBase = plan.terms.length || plan.ops.author ? plan.terms.slice(0, 4).concat(plan.ops.author ? [plan.ops.author] : []) : [];
+    const peopleOr = peopleBase.map(safe).filter(Boolean).flatMap((t) => t ? [`username.ilike.%${t}%`, `full_name.ilike.%${t}%`] : []);
+    const { data: peopleRows } = peopleOr.length
+      ? await db.from('profiles').select('*').or(peopleOr.join(',')).limit(240)
+      : await db.from('profiles').select('*').order('id', { ascending: false }).limit(60);
 
-    /* ---------- people: exact + fuzzy ---------- */
-    // Server-side prefilter (PostgREST ILIKE) over the first terms keeps the
-    // scoring pool bounded no matter how many weavers join — no full-table hugs.
-    const peoplePoolQ = terms.length
-      ? supabase
-          .from('profiles')
-          .select('*')
-          .or(
-            terms
-              .slice(0, 4)
-              .flatMap((t) => {
-                const s = t.replace(/[%_,()"\\]/g, '');
-                if (!s) return [];
-                return [`username.ilike.%${s}%`, `full_name.ilike.%${s}%`];
-              })
-              .join(','),
-          )
-          .limit(240)
-      : db.from('profiles').select('*').order('id', { ascending: false }).limit(60);
-    const { data: peopleRows } = await peoplePoolQ;
     const scoredPeople = (peopleRows || [])
       .map((pr) => {
         const un = (pr.username || '').toLowerCase();
@@ -377,7 +198,7 @@ export default async function handler(req, res) {
         const bio = (pr.bio || '').toLowerCase();
         const nameWords = `${un} ${fn} ${bio}`.match(/[\p{L}\p{N}]{2,}/gu) || [];
         let s = 0;
-        for (const t of terms) {
+        for (const t of plan.terms.concat(plan.ops.author ? [plan.ops.author] : [])) {
           if (un.includes(t)) s += 4;
           if (fn.includes(t)) s += 3;
           if (bio.includes(t)) s += 1;
@@ -386,7 +207,7 @@ export default async function handler(req, res) {
             if (fz >= 0.74) s += fz * 3;
           }
         }
-        if (un.includes(phrase)) s += 4;
+        if (un.includes(plan.phrase)) s += 4;
         return { pr, s };
       })
       .filter((x) => x.s > 0)
@@ -394,92 +215,68 @@ export default async function handler(req, res) {
       .slice(0, 8)
       .map((x) => x.pr);
 
-    /* ---------- groups: exact + fuzzy ---------- */
-    // Same discipline: prefilter by name/description instead of hauling the lot.
-    const groupOrQ = terms.length
-      ? supabase
-          .from('groups')
-          .select('*')
-          .or(
-            terms
-              .slice(0, 3)
-              .flatMap((t) => {
-                const s = t.replace(/[%_,()"\\]/g, '');
-                if (!s) return [];
-                return [`name.ilike.%${s}%`, `description.ilike.%${s}%`];
-              })
-              .join(','),
-          )
-          .limit(120)
-      : db.from('groups').select('*').limit(120);
-    const { data: groupRows } = await groupOrQ;
-    let myGroupIds = new Set();
+    const groupOr = plan.terms.slice(0, 3).map(safe).filter(Boolean).flatMap((t) => [`name.ilike.%${t}%`, `description.ilike.%${t}%`]);
+    const { data: groupRows } = groupOr.length
+      ? await db.from('groups').select('*').or(groupOr.join(',')).limit(120)
+      : await db.from('groups').select('*').limit(120);
+    let myGSet = new Set();
     if (user) {
       const { data: mem } = await db.from('group_members').select('group_id').eq('user_id', user.id);
-      myGroupIds = new Set((mem || []).map((m) => m.group_id));
+      myGSet = new Set((mem || []).map((m) => m.group_id));
     }
+    const termWords = plan.terms;
     const scoredGroups = (groupRows || [])
       .map((g) => {
-        const name = (g.name || '').toLowerCase();
-        const desc = (g.description || '').toLowerCase();
-        const gtags = (g.tags || []).join(' ').toLowerCase();
-        const words = `${name} ${desc} ${gtags}`.match(/[\p{L}\p{N}]{2,}/gu) || [];
+        const hay = `${g.name || ''} ${(g.description || '')} ${(g.tags || []).join(' ')}`.toLowerCase();
         let s = 0;
-        for (const t of terms) {
-          if (name.includes(t)) s += 5;
-          if (gtags.includes(t)) s += 4;
-          if (desc.includes(t)) s += 1.5;
-          if (s === 0) {
-            const fz = bestFuzzyInText(t, words);
-            if (fz >= 0.74) s += fz * 3;
-          }
-        }
-        if (name.includes(phrase)) s += 6;
-        // a small nudge so popular groups surface on ties
-        s += Math.log1p(g.member_count || 0) * 0.15;
-        return { g: { ...g, is_member: myGroupIds.has(g.id) }, s };
+        for (const t of termWords) if (hay.includes(t)) s += t.length > 4 ? 3 : 2;
+        s += Math.min(4, Math.log1p(g.member_count || 1) * 0.8);
+        return { g, s };
       })
-      .filter((x) => x.s > 0.3)
+      .filter((x) => x.s > 1.0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 8)
-      .map((x) => x.g);
+      .map((x) => ({ ...x.g, is_member: myGSet.has(x.g.id) }));
 
-    /* ---------- "did you mean" suggestion ---------- */
-    // if the top query term barely matched, offer the closest known vocabulary word
-    let suggestion = null;
-    if (matchQuality !== 'exact') {
-      const vocab = new Set();
-      for (const p of pool) {
-        (p.tags || []).forEach((t) => vocab.add(String(t).toLowerCase()));
-        (p.title || '').toLowerCase().match(/[\p{L}]{3,}/g)?.forEach((w) => vocab.add(w));
-      }
-      for (const k of LEXICON.keys()) vocab.add(k);
+    /* -------------------- attach the why -------------------- */
+    const items = top.map((r, i) => ({
+      ...r.p,
+      rank: i === 0
+        ? { engine: 'heavyrank', tier: r.tier, score: Math.round(r.score * 100) / 100, topFeatures: r.features }
+        : i < 4
+          ? { tier: r.tier, score: Math.round(r.score * 100) / 100 }
+          : undefined,
+    }));
 
-      let bestWord = null;
-      let bestSim = 0;
-      const probe = terms[0] || phrase;
-      for (const w of vocab) {
-        if (w === probe) continue;
-        const sim = similarity(probe, w);
-        if (sim > bestSim) { bestSim = sim; bestWord = w; }
-      }
-      if (bestWord && bestSim >= 0.6 && bestWord !== probe) suggestion = bestWord;
-    }
+    const suggestion = (() => {
+      if (tierUsed === 'exact' || termSet.size === 0) return null;
+      const words = Array.from(new Set(items.flatMap((p) => tokens(p.title || '') .concat(tokens((p.tags || []).join(' '))))));
+      return words.length ? words[0] : null;
+    })();
 
     return res.status(200).json({
       posts: items,
       people: scoredPeople,
       groups: scoredGroups,
       meta: {
-        terms: terms.length,
-        ranked: bucket.length,
-        matchQuality, // 'exact' | 'close' | 'suggested'
-        suggestion,   // e.g. "ayurveda" when user typed "ayurvediic"
-        query: raw,
+        engine: 'unicorn+earlybird+heavyrank@1.0',
+        ports: { unicorn: 'query-understanding', earlybird: 'candidate generation', heavyrank: 'engagement geometry', productrules: 'heuristics weave' },
+        stages: {
+          candidates: candidates.length,
+          pools: { field: pool.filter((c) => c.pool?.includes('field')).length, tag: pool.filter((c) => c.pool?.includes('tag')).length, operator: pool.filter((c) => c.pool?.includes('-op')).length, recency: pool.filter((c) => c.pool?.includes('recency')).length },
+          tier: tierUsed,
+          served: items.length,
+        },
+        ops: plan.ops,
+        terms: plan.terms,
+        constrained,
+        matchQuality: tierUsed,
+        suggestion,
+        ms: Date.now() - started,
       },
     });
   } catch (err) {
-    console.error('search error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('library engine error:', err);
+    return res.status(500).json({ error: err.message || 'The engine sputtered' });
   }
 }
