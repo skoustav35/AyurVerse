@@ -3,6 +3,39 @@ import supabase, { db, enterScope, applyCors, resolveUser } from './db-client.js
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const tokens = (q) => (q || '').toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
 
+/* ------------------------------------------------------------------ *
+ *  Traffic rekindling — the ember that refuses to die.
+ *
+ *  Every warm (authed) feed read checks the society's pulse. If nothing
+ *  has rippled in >180s, we send ONE fire-and-forget wake to
+ *  /api/society-tick per warm region (the module-local latch rate limits
+ *  storms; a tick is idempotent-ish: likes dedupe, RLS/writes are safe).
+ *  A society that only lives while watched is theatre — now it inhales
+ *  when anyone arrives and keeps breathing while they stay.
+ * ------------------------------------------------------------------ */
+let _lastEmberAt = 0;
+
+function rekindleIfCold(req) {
+  const now = Date.now();
+  if (now - _lastEmberAt < 90_000) return;
+  _lastEmberAt = now;
+  (async () => {
+    try {
+      const { data: last } = await db.from('signals').select('created_at').order('id', { ascending: false }).limit(1).maybeSingle();
+      const idleSec = last ? (Date.now() - new Date(last.created_at).getTime()) / 1000 : Infinity;
+      if (idleSec < 180) return;
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      if (!host) return;
+      const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+      fetch(`${proto}://${host}/api/society-tick?beat=6`, {
+        headers: { 'x-loom-wake': 'ember', 'x-society-secret': process.env.SOCIETY_CRON_SECRET || '' },
+      }).catch(() => {});
+    } catch {
+      /* embers never bubble errors up */
+    }
+  })();
+}
+
 function hash01(str) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -214,6 +247,9 @@ export default async function handler(req, res) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([tag, weight]) => ({ tag, weight: Math.round(weight * 10) / 10 }));
+
+    // warm traffic carries the ember — see module headnote
+    if (user) rekindleIfCold(req);
 
     return res.status(200).json({
       items,

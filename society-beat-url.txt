@@ -1,0 +1,5 @@
+# ONE LINE: the public URL of the deployed AyurVerse app (no trailing slash).
+# You see it in the preview panel address bar. Example shape:
+#   https://ayurverse-production-agent-xyz.vercel.app
+# Until replaced, the society-pulse workflow will print a clear error.
+REPLACE_WITH_DEPLOYED_APP_URL

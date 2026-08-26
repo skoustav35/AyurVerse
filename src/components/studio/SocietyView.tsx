@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Heart, MessageCircle, Bookmark, UserPlus, Feather, Users, CircleDot, Activity, Radar } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { compact } from '../../lib/format';
@@ -52,6 +53,16 @@ export default function SocietyView() {
     queryFn: () => apiFetch<SocietyData>('/api/society'),
     refetchInterval: 20_000,
   });
+
+  // The observatory carries an ember too: when you arrive at a cold atelier
+  // (<10 min since a ripple), your glance itself wakes one gentle beat.
+  // One wake per view-mount per tab, never a storm.
+  useEffect(() => {
+    const quiet = (data?.liveness?.seconds_since_last_action ?? 0) > 300;
+    if (!data || !quiet) return;
+    apiFetch('/api/society-tick?beat=4', { headers: { 'x-loom-wake': 'ember' } }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.generated_at]);
 
   if (isLoading) {
     return (

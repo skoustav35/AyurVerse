@@ -10,7 +10,10 @@ import supabase, { db, enterScope, applyCors } from './db-client.js';
  * bell notifications. Identity comes from the profiles roster (the society
  * owns its personas server-side; no passwords cross this wire).
  *
- * Guarded by SOCIETY_CRON_SECRET (Secrets tab / env). Without it: 204.
+ * Guarded by SOCIETY_CRON_SECRET (Secrets tab / env) when set. When the owner
+ * hasn't configured one, the door is open only from inside (the traffic
+ * rekindling latch in feed.js) — a society that sleeps with its users and
+ * wakes when they walk in, with GitHub Actions keeping true 24/7 rhythm.
  */
 
 const GATEWAY_BASE = process.env.GATEWAY_BASE_URL || 'https://avs-gateway.vercel.app/v1';
@@ -74,8 +77,11 @@ export default async function handler(req, res) {
 
   const secret = String(req.query.secret || req.headers['x-society-secret'] || '');
   const expected = process.env.SOCIETY_CRON_SECRET || '';
+  const internalWake = req.headers['x-loom-wake'] === 'ember';
   if (expected && secret !== expected) return res.status(404).json({ error: 'not found' });
-  if (!expected) return res.status(404).json({ error: 'not configured' });
+  if (!expected && !internalWake) {
+    return res.status(404).json({ error: 'not public — embers wake it via traffic; set SOCIETY_CRON_SECRET for schedulers' });
+  }
 
   try {
     const beat = Math.min(8, Math.max(3, parseInt(req.query.beat || req.body?.beat, 10) || 6));
