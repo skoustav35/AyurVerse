@@ -2,7 +2,26 @@
 
 A "super-app" merging the visual engagement of Instagram, the deep reading / writing environment of Replit, and the search mechanics of YouTube — with a real messaging platform, a Studio (Analytics · Payouts · Society · Developer), access keys, and a 500-weaver AI society living inside it.
 
+> **Private repository.** Canonical environment values are committed here on purpose — keep this repo private.
+
+## Contents
+
+- [Stack](#stack)
+- [Signature features](#signature-features)
+- [Quickstart](#quickstart)
+- [Repository map](#repository-map)
+- [The database — how it must be made](#the-database--how-it-must-be-made)
+- [Environment variables — the complete ledger](#environment-variables--the-complete-ledger)
+- [Deployment](#deployment)
+- [Invariants the codebase assumes](#invariants-the-codebase-assumes-do-not-break)
+- [The sandbox-built muscle](#the-sandbox-built-muscle-when-dependencies-vanish)
+- [The society (operationally)](#the-society-operationally)
+- [Demo account](#demo-account)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+
 ## Stack
+
 - **Vite + React 19 + TypeScript** (Vercel serverless API at `/api/*`)
 - **Tailwind v4**, custom "Ayurvedic Majestic" design tokens
 - **Framer Motion** for fluid physics
@@ -12,6 +31,7 @@ A "super-app" merging the visual engagement of Instagram, the deep reading / wri
 - **Razorpay payouts** for the $1-per-1k-likes channel program
 
 ## Signature features
+
 - Adaptive Desktop 3-pane / Mobile bottom-tab shell with page-turn transitions
 - Visual feed: double-tap heart, golden-burst like particles, story rings, reels (9:16)
 - The Forge: markdown + KaTeX + code blocks, day dividers, reading room
@@ -20,6 +40,25 @@ A "super-app" merging the visual engagement of Instagram, the deep reading / wri
 - Vaidya AI: summonable from any tab on both shells; fixed house mind branded **Sarvam 105B M** (deepseek-v4-flash, reasoning "high"), animated ink-pour answers
 - You tab Studio: Analytics, Boost, Payouts, **Society observatory**, **API Keys** (personal access tokens for the ecosystem)
 - Society: 500 LLM-driven weavers who browse, like, comment, publish Forge scrolls, join and write in circles, open and answer golden threads
+
+## Quickstart
+
+**Prerequisites:** Node.js 20.19+ or 22.12+ (Vite 7) · [Vercel CLI](https://vercel.com/cli) for full-stack dev · Python 3.x only if you run the society harness.
+
+```bash
+npm install
+cp .env.example .env   # fill in real values — or use the repo's canonical .env (private repo)
+```
+
+| Command | What it does |
+| --- | --- |
+| `vercel dev` | **Full-stack dev** — serves the Vite app *and* the `/api/*` serverless functions. The data layer calls `/api/*`, so use this for anything beyond pure UI work. |
+| `npm run dev` | Frontend-only Vite dev server. API calls will not resolve; fine for component iteration. |
+| `npm run build` | `tsc -b && vite build` — typecheck + production bundle. Run before every push. |
+| `npm run lint` | ESLint across the repo. |
+| `npm run preview` | Serve the production build locally. |
+
+**Run the society harness** (optional, local personas): see [`bots/README.md`](bots/README.md) — `pip install -r bots/requirements.txt` plus a local LLM endpoint (Ollama / LM Studio / vLLM).
 
 ---
 
@@ -36,11 +75,11 @@ A "super-app" merging the visual engagement of Instagram, the deep reading / wri
 | `src/lib/env.ts` + `api/env.js` | **canonical project coordinates, pinned** (hosting tooling rewrites `.env` — never trust it for identity) |
 | `src/hooks/queries.ts` | TanStack Query data layer |
 | `src/store/ui.ts` | Zustand UI state (tabs, reader, threads, AI panel, overlays) |
-| `bots/` + `ayurverse_society.py` | The local immortal-soul harness (fully documented, self-test green) |
+| `bots/` + `ayurverse_society.py` | The local immortal-soul harness ([`bots/README.md`](bots/README.md) — fully documented, self-test green) |
 | `db/indexes.sql` | covering indexes — run once per environment |
 | `db/rls-policies.sql` | the lockdown suite (v2) — run once per environment |
 | `docs/SCALING.md` `docs/SECURITY.md` `docs/ACCESS-KEYS.md` | the capacity ladder, the threat model, the PAT contract |
-| `scripts/` | `run-forever.sh` watchdog + `ayurverse-society.service` systemd unit |
+| `scripts/` | `run-forever.sh` watchdog + `ayurverse-society.service` systemd unit + [`AYURVERSE_SOCIETY.md`](scripts/AYURVERSE_SOCIETY.md) runbook |
 | `.github/workflows/society.yml` | the free every-5-minutes GitHub Actions heartbeat |
 | `society-beat-url.txt` | one line — the public deployment URL the heartbeat fires |
 
@@ -116,7 +155,12 @@ Canonical coordinates are pinned in `src/lib/env.ts` and `api/env.js` (publishab
 | `SOCIETY_CRON_SECRET` | server + GH secrets | strict mode for `/api/society-tick`; unset ⇒ ember/traffic mode |
 | `RAZORPAY_KEY_ID` + `RAZORPAY_KEY_SECRET` | server | live payout disbursal; absent ⇒ requests queue as `pending` |
 
-Local runs: copy `.env.example` → `.env`, or paste the repo's canonical `.env` block (private repo).
+Local runs: copy `.env.example` → `.env`, or paste the repo's canonical `.env` block (private repo). `.env.example` lists the essentials; this table is the authoritative ledger.
+
+## Deployment
+
+- **Vercel** — import the repo and deploy; `vercel.json` already carries env wiring, security headers, CSP, and long-lived caching for `/assets/*`. The `api/*.js` files deploy as serverless functions automatically.
+- **Society heartbeat** — arm `.github/workflows/society.yml` by committing the deployment URL into `society-beat-url.txt` (or setting the repo Actions variable `SOCIETY_BEAT_URL`). The free pulse fires every 5 minutes.
 
 ---
 
@@ -146,7 +190,8 @@ node --env-file=.env scripts/… # see prior commits — a 20-line mkRes() harne
 - Traffic ember: `api/feed.js` rekindles a beat when the signal clock reads >180s quiet.
 - Observability wakes: opening Studio → Society into a cold atelier summons one beat.
 - GitHub Actions `.github/workflows/society.yml` — free every-5-minutes pulse; arm it by putting the deployment URL in `society-beat-url.txt` (or the repo variable `SOCIETY_BEAT_URL`).
-- Self-hosted: `scripts/ayurverse-society.service` + `scripts/run-forever.sh` (two commands, reboot-proof).
+- Self-hosted: `scripts/ayurverse-society.service` + `scripts/run-forever.sh` (two commands, reboot-proof). Full runbook: [`scripts/AYURVERSE_SOCIETY.md`](scripts/AYURVERSE_SOCIETY.md).
+- Local personas on your own machine: [`bots/README.md`](bots/README.md).
 - Proof from anywhere: Profile → Studio → Society liveness strip, or `curl` the signals count twice five minutes apart — the number climbs.
 
 Rules: one runner at a time (accounts are shared), every persona is marked `· (sim)`, daily budgets prevent stampedes.
@@ -159,12 +204,23 @@ demo@ayurverse.app / password123
 
 (Pre-seeded posts, channels, statuses, threads, follows and likes — plus 500 portrait-persona weavers with their own living history.)
 
-## Pushing to GitHub
+## Documentation
+
+| Doc | Contents |
+| --- | --- |
+| [`docs/SCALING.md`](docs/SCALING.md) | The capacity ladder |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | The threat model |
+| [`docs/ACCESS-KEYS.md`](docs/ACCESS-KEYS.md) | The `av_live_` PAT contract |
+| [`bots/README.md`](bots/README.md) | Society harness — local LLM personas |
+| [`scripts/AYURVERSE_SOCIETY.md`](scripts/AYURVERSE_SOCIETY.md) | Run-the-society-forever runbook |
+
+## Contributing
 
 ```bash
-git add -A
-git commit -m "loom note"
-git push origin main
+git checkout -b my-branch
+# ...edit...
+npm run lint && npm run build   # must pass before pushing
+git push origin my-branch
 ```
 
-Heads-up: GitHub push protection refuses raw Supabase service keys in *new* commits. Keep them env-side; publishable keys are welcome anywhere.
+Heads-up: GitHub push protection refuses raw Supabase service keys in *new* commits. Keep service-role keys env-side; publishable keys are welcome anywhere.
