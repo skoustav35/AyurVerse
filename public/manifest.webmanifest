@@ -1,0 +1,19 @@
+{
+  "name": "AyurVerse — The Sovereign Sattvic Super-App",
+  "short_name": "AyurVerse",
+  "description": "An Ayurvedic-majestic super-app: sovereign visual feeds, scholarly manuscripts in the Forge, theater video masterclasses, and circadian Dinacharya rhythms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e2118",
+  "theme_color": "#12291c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "lifestyle", "education", "social"]
+}

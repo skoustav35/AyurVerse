@@ -1,0 +1,790 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,600;1,400&family=Noto+Serif+Bengali:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* The theme switch sets `dark`/`light` on <html> (see App.tsx). Without this the
+   built-in `dark:` variant keeps following prefers-color-scheme, so every
+   `dark:` rule in the tree renders its light-mode values on the dark canvas. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: "Fraunces", "Noto Serif Bengali", Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-bangla: "Noto Serif Bengali", "Fraunces", Georgia, serif;
+
+  /* Enriched Dark Ayurvedic Canvas & Palette */
+  --color-parchment: #0d1611;
+  --color-parchment-deep: #080f0a;
+
+  --color-sand-100: #121e17;
+  --color-sand-200: #1a2a20;
+  --color-sand-300: #2a4133;
+  --color-sand-400: #8c9e8e;
+  --color-sand-500: #d4a017;
+
+  --color-neem-50: #edfbf3;
+  --color-neem-100: #d8f4e5;
+  --color-neem-200: #aae0c1;
+  --color-neem-300: #78c297;
+  --color-neem-400: #4ea472;
+  --color-neem-500: #377852;
+  --color-neem-600: #265439;
+  --color-neem-700: #1b3d29;
+  --color-neem-800: #11281a;
+  --color-neem-900: #0a1a10;
+  --color-neem-950: #061009;
+
+  --color-saffron-50: #291506;
+  --color-saffron-100: #42200a;
+  --color-saffron-200: #69320e;
+  --color-saffron-300: #9e4b14;
+  --color-saffron-400: #f09e3f;
+  --color-saffron-500: #f58f38;
+  --color-saffron-600: #faab5e;
+  --color-saffron-700: #fbc68e;
+  --color-saffron-800: #fedebd;
+  --color-saffron-900: #fef2e6;
+
+  --color-gold-300: #f7e296;
+  --color-gold-400: #f1cb5b;
+  --color-gold-500: #e0aa1f;
+  --color-gold-600: #f4cf65;
+  --color-gold-700: #fae18f;
+
+  --color-terra-400: #e58d69;
+  --color-terra-500: #d86838;
+  --color-terra-600: #ea7a4c;
+  --color-terra-700: #f39c76;
+
+  --color-ink-400: #8f9e91;
+  --color-ink-500: #aebdb0;
+  --color-ink-600: #ccdbcf;
+  --color-ink-700: #e2ece4;
+  --color-ink-800: #f0f6f1;
+  --color-ink-900: #fcfefc;
+
+  --shadow-warm: 0 16px 44px -14px rgba(0, 0, 0, 0.85);
+
+  /* Apple-grade surfaces — continuous corners, layered shadows, gold leaf. */
+  --shadow-apple-rest:
+    0 1px 0 rgba(246, 220, 138, 0.28) inset,
+    0 1px 1px rgba(0, 0, 0, 0.3),
+    0 18px 45px -16px rgba(0, 0, 0, 0.88),
+    0 30px 64px -32px rgba(0, 0, 0, 0.75);
+  --shadow-apple-hover:
+    0 1px 0 rgba(246, 220, 138, 0.45) inset,
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    0 26px 60px -18px rgba(0, 0, 0, 0.96),
+    0 46px 95px -36px rgba(0, 0, 0, 0.85);
+  --gold-leaf-1: #f6dc8a;
+  --gold-leaf-2: #ecc34e;
+  --gold-leaf-3: #d96f10;
+  --apple-radius-card: 32px;
+  --apple-radius-card-lg: 40px;
+  --apple-blur-card: 24px;
+  --ease-apple: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-apple-decel: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-apple-sharp: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --animate-spin-slower: spin-slower 120s linear infinite;
+  --animate-gold-shimmer: gold-shimmer 2.4s ease-in-out infinite;
+  --animate-spin-rev: spin-rev 180s linear infinite;
+  --animate-spin-slowest: spin-slower 260s linear infinite;
+  --animate-float-soft: float-soft 9s ease-in-out infinite;
+  --animate-ping-slow: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-shimmer-gold: shimmer-gold 6.5s ease-in-out infinite;
+  --animate-rise: rise 12s linear infinite;
+  --animate-glow-pulse: glow-pulse 6s ease-in-out infinite;
+  --animate-aurora-1: aurora-1 18s ease-in-out infinite;
+  --animate-aurora-2: aurora-2 22s ease-in-out infinite;
+  --animate-aurora-3: aurora-3 20s ease-in-out infinite;
+  --animate-rise-and-sway: rise-and-sway 14s ease-in-out infinite;
+  --animate-border-pulse: border-gold-pulse 4s ease-in-out infinite;
+}
+
+@keyframes ping-slow {
+  0% { transform: scale(1); opacity: 0.6; }
+  75%, 100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes spin-slower {
+  to { transform: rotate(360deg); }
+}
+@keyframes spin-rev {
+  to { transform: rotate(-360deg); }
+}
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+@keyframes shimmer-gold {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes rise {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0; }
+  8% { opacity: var(--rise-opacity, 0.8); }
+  100% { transform: translate3d(0, -88vh, 0) scale(0.35); opacity: 0; }
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.07); }
+}
+
+@keyframes gold-shimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+    opacity: 0.6;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 1;
+  }
+}
+
+@keyframes aurora-1 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.65; }
+  50% { transform: translate3d(45px, 35px, 0) scale(1.14); opacity: 0.85; }
+}
+
+@keyframes aurora-2 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); opacity: 0.55; }
+  50% { transform: translate3d(-55px, -40px, 0) scale(0.94); opacity: 0.78; }
+}
+
+@keyframes aurora-3 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.95); opacity: 0.48; }
+  50% { transform: translate3d(35px, -45px, 0) scale(1.1); opacity: 0.72; }
+}
+
+@keyframes rise-and-sway {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.7);
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--ember-opacity, 0.75);
+  }
+  50% {
+    transform: translate3d(24px, -48vh, 0) scale(1.15);
+    opacity: var(--ember-opacity, 0.75);
+  }
+  88% {
+    opacity: var(--ember-opacity, 0.75);
+  }
+  100% {
+    transform: translate3d(-18px, -102vh, 0) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes border-gold-pulse {
+  0%, 100% { border-color: rgba(224, 170, 31, 0.22); box-shadow: 0 0 14px -3px rgba(224, 170, 31, 0.08); }
+  50% { border-color: rgba(236, 195, 78, 0.48); box-shadow: 0 0 24px -2px rgba(224, 170, 31, 0.25); }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background-color: #070d09;
+  color: var(--color-ink-800);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile app-shell pinning: document never scroll-janks, keyboard never warps the tab bar,
+   and inputs are 16px so iOS never auto-zooms on focus. */
+@media (max-width: 1023px) {
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+  #root {
+    height: 100%;
+  }
+  input,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Celestial starlight lattice */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image:
+    radial-gradient(rgba(236, 195, 78, 0.12) 1px, transparent 1.6px),
+    radial-gradient(rgba(78, 148, 110, 0.08) 1px, transparent 1.6px);
+  background-size: 28px 28px, 56px 56px;
+  background-position: 0 0, 14px 14px;
+}
+
+#root {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-gold-400) 45%, transparent);
+  color: #ffffff;
+}
+
+/* Clean, hidden scrollbars across all scroll containers — retains full scrolling functionality without visual pill bars */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar,
+::-webkit-scrollbar {
+  width: 0px !important;
+  height: 0px !important;
+  display: none !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border: none !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Enriched Ayurvedic Cards — deep obsidian glass, specular highlight, depth drop shadow */
+.card-warm {
+  position: relative;
+  background: linear-gradient(172deg, rgba(20, 34, 25, 0.88) 0%, rgba(11, 20, 15, 0.94) 100%);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(224, 170, 31, 0.24);
+  border-radius: 1.5rem;
+  box-shadow:
+    inset 0 1px 0 rgba(246, 220, 138, 0.3),
+    0 20px 48px -14px rgba(0, 0, 0, 0.88),
+    0 0 25px -6px rgba(224, 170, 31, 0.08);
+  transition: all 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-warm:hover {
+  border-color: rgba(244, 216, 120, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 220, 138, 0.45),
+    0 26px 64px -15px rgba(0, 0, 0, 0.96),
+    0 0 35px -3px rgba(224, 170, 31, 0.22);
+  transform: translateY(-2px);
+}
+
+.glass-warm {
+  background: rgba(14, 25, 18, 0.84);
+  backdrop-filter: blur(24px) saturate(1.45);
+  -webkit-backdrop-filter: blur(24px) saturate(1.45);
+  border: 1px solid rgba(224, 170, 31, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 220, 138, 0.16),
+    0 24px 70px -28px rgba(0, 0, 0, 0.92);
+}
+
+.skeleton {
+  border-radius: 0.6rem;
+  background: linear-gradient(90deg, rgba(22, 38, 28, 0.6) 25%, rgba(35, 58, 44, 0.8) 45%, rgba(22, 38, 28, 0.6) 65%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* ------------------------------------------------ Apple-grade card surfaces */
+.card-apple,
+.card-apple-soft {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(172deg, rgba(22, 38, 28, 0.85) 0%, rgba(12, 22, 16, 0.92) 100%);
+  backdrop-filter: blur(var(--apple-blur-card)) saturate(1.45);
+  -webkit-backdrop-filter: blur(var(--apple-blur-card)) saturate(1.45);
+  border: 1px solid rgba(224, 170, 31, 0.25);
+  border-radius: var(--apple-radius-card);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 220, 138, 0.28),
+    0 20px 50px -16px rgba(0, 0, 0, 0.88),
+    0 0 24px -5px rgba(224, 170, 31, 0.1);
+  overflow: hidden;
+  transition:
+    transform 0.42s var(--ease-apple),
+    box-shadow 0.42s var(--ease-apple),
+    border-color 0.42s var(--ease-apple);
+}
+
+.card-apple-soft {
+  background: linear-gradient(172deg, rgba(18, 30, 23, 0.82) 0%, rgba(10, 18, 13, 0.9) 100%);
+  border: 1px solid rgba(224, 170, 31, 0.2);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1px 0 rgba(246, 220, 138, 0.18),
+    0 10px 28px -12px rgba(0, 0, 0, 0.75);
+}
+
+.border-gold-glow {
+  border: 1px solid rgba(224, 170, 31, 0.35);
+  box-shadow: 0 0 16px -3px rgba(224, 170, 31, 0.18);
+}
+
+.border-auric {
+  border: 1px solid rgba(224, 170, 31, 0.24);
+}
+
+.divider-gold-sheen {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(224, 170, 31, 0.35), transparent);
+}
+
+.text-parchment, [class*="text-parchment"] {
+  color: #f8f3e5 !important;
+}
+
+/* Ensure headings with text-neem-950/900 are luminous & high-contrast in dark mode */
+html:not(.light) .text-neem-950 {
+  color: var(--color-ink-900) !important;
+}
+html:not(.light) .text-neem-900 {
+  color: var(--color-ink-800) !important;
+}
+html:not(.light) .text-neem-800 {
+  color: var(--color-gold-300) !important;
+}
+
+/* ------------------------------------------------ Original Light Mode Preservation */
+html.light {
+  --color-parchment: #f2ead8;
+  --color-parchment-deep: #eaddc4;
+
+  --color-sand-100: #f6efdf;
+  --color-sand-200: #eadcc0;
+  --color-sand-300: #dcc9a3;
+  --color-sand-400: #c9ad7c;
+  --color-sand-500: #b3935e;
+
+  --color-neem-50: #eef4ec;
+  --color-neem-100: #d8e6d5;
+  --color-neem-200: #b5cdb2;
+  --color-neem-300: #8db18f;
+  --color-neem-400: #66936c;
+  --color-neem-500: #3d7a5a;
+  --color-neem-600: #2e6b4e;
+  --color-neem-700: #22543d;
+  --color-neem-800: #1b4230;
+  --color-neem-900: #12291c;
+  --color-neem-950: #0c1b13;
+
+  --color-saffron-50: #fdf3e3;
+  --color-saffron-100: #fbe6c4;
+  --color-saffron-200: #f7cf8d;
+  --color-saffron-300: #f4b866;
+  --color-saffron-400: #f09e3f;
+  --color-saffron-500: #e8812a;
+  --color-saffron-600: #d96f10;
+  --color-saffron-700: #b4550c;
+  --color-saffron-800: #8f4310;
+  --color-saffron-900: #6f3412;
+
+  --color-gold-300: #f4d878;
+  --color-gold-400: #ecc34e;
+  --color-gold-500: #e0aa1f;
+  --color-gold-600: #c08f0e;
+  --color-gold-700: #9a700b;
+
+  --color-terra-400: #cf7046;
+  --color-terra-500: #c05a2e;
+  --color-terra-600: #a34a26;
+  --color-terra-700: #84391f;
+
+  --color-ink-400: #a3906c;
+  --color-ink-500: #877657;
+  --color-ink-600: #6b5d43;
+  --color-ink-700: #51452f;
+  --color-ink-800: #3b3121;
+  --color-ink-900: #262012;
+
+  --shadow-warm: 0 6px 20px -8px rgba(78, 55, 14, 0.12);
+  --shadow-apple-rest:
+    0 1px 0 rgba(255, 250, 235, 0.7) inset,
+    0 1px 1px rgba(78, 55, 14, 0.04),
+    0 4px 14px -6px rgba(78, 55, 14, 0.1);
+  --shadow-apple-hover:
+    0 1px 0 rgba(255, 250, 235, 0.85) inset,
+    0 1px 1px rgba(78, 55, 14, 0.04),
+    0 8px 22px -8px rgba(78, 55, 14, 0.15);
+}
+
+html.light body {
+  background-color: var(--color-parchment);
+  color: var(--color-ink-800);
+}
+
+html.light .card-warm {
+  background: var(--color-parchment);
+  border: 1px solid rgb(201 173 124 / 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.6),
+    0 4px 16px -6px rgba(78, 55, 14, 0.10),
+    0 1px 2px 0 rgba(78, 55, 14, 0.04);
+}
+
+html.light .card-warm:hover {
+  border-color: rgba(201, 173, 124, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.8),
+    0 8px 22px -8px rgba(78, 55, 14, 0.14);
+}
+
+html.light .glass-warm {
+  background: color-mix(in srgb, var(--color-parchment) 84%, transparent);
+  border: 1px solid rgb(228 201 143 / 0.4);
+  box-shadow: 0 8px 24px -12px rgba(60, 40, 5, 0.14);
+}
+
+html.light .card-apple {
+  background: color-mix(in srgb, var(--color-parchment) 82%, transparent);
+  border: 1px solid rgb(201 173 124 / 0.4);
+  box-shadow:
+    0 1px 0 rgba(255, 250, 235, 0.7) inset,
+    0 4px 14px -6px rgba(78, 55, 14, 0.1);
+}
+
+html.light .card-apple-soft {
+  background: color-mix(in srgb, var(--color-parchment) 94%, transparent);
+  border: 1px solid rgb(201 173 124 / 0.35);
+  box-shadow:
+    0 1px 0 rgba(255, 250, 235, 0.5) inset,
+    0 2px 8px -4px rgba(78, 55, 14, 0.07);
+}
+
+html.light aside,
+html.light .app-bottom-nav {
+  background-color: rgba(242, 234, 216, 0.94) !important;
+  border-color: rgba(201, 173, 124, 0.45) !important;
+  box-shadow: 0 0 14px -6px rgba(78, 55, 14, 0.08) !important;
+}
+
+html.light .glass-nav {
+  background: rgba(247, 244, 237, 0.68) !important;
+  backdrop-filter: blur(20px) saturate(1.45);
+  -webkit-backdrop-filter: blur(20px) saturate(1.45);
+  border: 1px solid rgba(201, 173, 124, 0.45) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 12px 32px -12px rgba(78, 55, 14, 0.18) !important;
+}
+
+html.light .text-parchment {
+  color: #f2ead8 !important;
+}
+
+@media (min-width: 1024px) {
+  .card-apple { border-radius: var(--apple-radius-card-lg); }
+  .card-apple-soft { border-radius: 24px; }
+}
+
+/* Gold-leaf edge — a 1.5px gradient rail that hugs the top of the card.
+   Animates a subtle horizontal shimmer on hover via gold-shimmer. */
+.card-apple::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 1.5px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 8%,
+    var(--gold-leaf-1) 24%,
+    var(--gold-leaf-2) 50%,
+    var(--gold-leaf-3) 76%,
+    transparent 92%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-position: 0% 50%;
+  pointer-events: none;
+  opacity: 0.65;
+  transition: opacity 0.42s var(--ease-apple);
+}
+
+.card-apple:hover::before,
+.card-apple:focus-within::before {
+  opacity: 1;
+  animation: gold-shimmer 2.4s ease-in-out infinite;
+}
+
+/* Inner top sheen — radial highlight that simulates a glass surface catching
+   overhead light. */
+.card-apple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 60% at 50% -10%,
+    rgba(255, 250, 235, 0.55),
+    rgba(255, 250, 235, 0) 60%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: screen;
+}
+
+/* Cursor-tracked spotlight layer. Painted by useSpotlight() via inline
+   `style.background`. Hidden when prefers-reduced-motion is set. */
+.card-apple .spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 1;
+  transition: opacity 0.42s var(--ease-apple);
+}
+
+.card-apple .spotlight.is-idle {
+  opacity: 0;
+}
+
+/* Hover lift — kept as a CSS class so non-Framer consumers also benefit. */
+.motion-spring-hover {
+  transition:
+    transform 0.42s var(--ease-apple),
+    box-shadow 0.42s var(--ease-apple),
+    border-color 0.42s var(--ease-apple);
+}
+
+/* Visible focus ring matches the gold leaf so keyboard users see the same
+   highlight as mouse users. */
+.card-apple:focus-visible,
+.card-apple-soft:focus-visible {
+  outline: 2px solid var(--gold-leaf-2);
+  outline-offset: 3px;
+}
+
+/* Reduced-motion guard — collapse everything to plain fades and hide the
+   cursor spotlight. */
+@media (prefers-reduced-motion: reduce) {
+  .card-apple,
+  .card-apple-soft,
+  .motion-spring-hover {
+    transition-duration: 0.12s !important;
+  }
+  .card-apple:hover::before,
+  .card-apple:focus-within::before {
+    animation: none !important;
+  }
+  .card-apple .spotlight {
+    display: none !important;
+  }
+}
+
+
+/* Translucent landing nav — parchment glass: content drifts beneath it. */
+.glass-nav {
+  background: rgba(13, 22, 17, 0.62);
+  backdrop-filter: blur(20px) saturate(1.45);
+  -webkit-backdrop-filter: blur(20px) saturate(1.45);
+  border: 1px solid rgba(228, 201, 143, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.18),
+    0 16px 44px -16px rgba(0, 0, 0, 0.5);
+}
+
+/* Blending strips where bright parchment meets dark neem-950. */
+.blend-to-light {
+  background: linear-gradient(180deg, var(--color-neem-950) 0%, #31463a 38%, #8a7a5c 72%, var(--color-parchment) 100%);
+}
+.blend-to-dark {
+  background: linear-gradient(180deg, var(--color-parchment) 0%, #a89468 28%, #26392c 62%, var(--color-neem-950) 100%);
+}
+
+/* ------------------------------------------------- Markdown body (Forge) */
+
+.md-body {
+  font-size: 15px;
+  line-height: 1.78;
+  color: var(--color-ink-800);
+}
+.md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+  font-family: var(--font-display);
+  color: var(--color-ink-900);
+  font-weight: 600;
+  line-height: 1.28;
+}
+.md-body h2 {
+  font-size: 1.5rem;
+  margin: 2.1rem 0 0.8rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-sand-400) 55%, transparent);
+}
+.md-body h3 { font-size: 1.22rem; margin: 1.7rem 0 0.6rem; }
+.md-body h4 { font-size: 1.05rem; margin: 1.4rem 0 0.5rem; }
+.md-body p { margin: 0.85rem 0; }
+.md-body strong { color: var(--color-ink-900); font-weight: 650; }
+.md-body em { color: var(--color-ink-700); }
+.md-body a {
+  color: var(--color-saffron-700);
+  text-decoration: underline;
+  text-decoration-color: var(--color-gold-400);
+  text-underline-offset: 3px;
+  font-weight: 500;
+}
+.md-body ul { list-style: disc; padding-left: 1.5rem; margin: 0.9rem 0; }
+.md-body ol { list-style: decimal; padding-left: 1.5rem; margin: 0.9rem 0; }
+.md-body li { margin: 0.35rem 0; }
+.md-body li::marker { color: var(--color-saffron-600); font-weight: 600; }
+.md-body blockquote {
+  border-left: 3px solid var(--color-gold-500);
+  background: color-mix(in srgb, var(--color-saffron-500) 8%, transparent);
+  padding: 0.7rem 1.1rem;
+  margin: 1.3rem 0;
+  border-radius: 0 0.8rem 0.8rem 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-ink-700);
+}
+.md-body blockquote p { margin: 0.3rem 0; }
+.md-body code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-sand-200);
+  color: var(--color-terra-700);
+  padding: 0.12em 0.4em;
+  border-radius: 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--color-sand-400) 50%, transparent);
+}
+.md-body pre {
+  background: linear-gradient(160deg, #12291c, #0c1c13);
+  border: 1px solid rgb(244 196 48 / 0.14);
+  border-radius: 0.95rem;
+  padding: 1.05rem 1.15rem;
+  font-size: 12.5px;
+  line-height: 1.7;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.03), 0 18px 40px -26px rgb(12 27 19 / 0.8);
+}
+.md-body pre code {
+  font-family: var(--font-mono);
+  color: #eadfc4;
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+.md-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.3rem 0;
+  font-size: 13.5px;
+}
+.md-body th {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-ink-900);
+  background: var(--color-sand-200);
+}
+.md-body th, .md-body td {
+  border: 1px solid var(--color-sand-300);
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+}
+.md-body hr {
+  border: none;
+  text-align: center;
+  margin: 2.2rem 0;
+}
+.md-body hr::after {
+  content: "॥";
+  color: var(--color-gold-600);
+  font-size: 1.25rem;
+}
+.md-body img { border-radius: 1rem; margin: 1.2rem 0; }
+.md-body .katex { font-size: 1.05em; }
+.md-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.7rem 0.25rem;
+  margin: 1rem 0;
+}
+
+/* ----------------------------------------- warm highlight.js (on deep neem) */
+.hljs-comment, .hljs-quote { color: #85937b; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-meta .hljs-keyword { color: #f0a35e; }
+.hljs-string, .hljs-regexp, .hljs-meta .hljs-string { color: #b8cc9e; }
+.hljs-number, .hljs-literal { color: #ecc34e; }
+.hljs-title, .hljs-title.function_ { color: #8fd0a5; }
+.hljs-title.class_, .hljs-type, .hljs-built_in { color: #f2c879; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable { color: #e8b45e; }
+.hljs-operator { color: #d8c9a5; }
+.hljs-name, .hljs-tag { color: #e98f6e; }
+.hljs-punctuation { color: #c9b98e; }
+.hljs-symbol, .hljs-bullet, .hljs-link { color: #f4c430; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+
+/* --- Vaidya chat: compact markdown inside bubbles --- */
+.prose-vaidya > :first-child { margin-top: 0; }
+.prose-vaidya > :last-child { margin-bottom: 0; }
+.prose-vaidya p { margin: 0.4em 0; }
+.prose-vaidya h1, .prose-vaidya h2, .prose-vaidya h3 {
+  font-family: var(--font-display, serif);
+  font-weight: 600;
+  color: var(--color-neem-950, #12291c);
+  margin: 0.6em 0 0.3em;
+  line-height: 1.25;
+}
+.prose-vaidya h1 { font-size: 1.15em; }
+.prose-vaidya h2 { font-size: 1.08em; }
+.prose-vaidya h3 { font-size: 1em; }
+.prose-vaidya ul, .prose-vaidya ol { margin: 0.4em 0; padding-left: 1.15em; }
+.prose-vaidya li { margin: 0.15em 0; }
+.prose-vaidya ul { list-style: disc; }
+.prose-vaidya ol { list-style: decimal; }
+.prose-vaidya a { color: var(--color-saffron-700, #a85a12); text-decoration: underline; }
+.prose-vaidya code {
+  background: rgba(122, 74, 18, 0.1);
+  padding: 0.08em 0.35em;
+  border-radius: 5px;
+  font-size: 0.88em;
+}
+.prose-vaidya pre {
+  margin: 0.5em 0;
+  border-radius: 12px;
+  font-size: 0.85em;
+  overflow-x: auto;
+}
+.prose-vaidya pre code { background: transparent; padding: 0; }
+.prose-vaidya blockquote {
+  border-left: 3px solid var(--color-gold-500, #d4a017);
+  padding-left: 0.8em;
+  margin: 0.5em 0;
+  font-style: italic;
+  color: var(--color-ink-600, #6b5d43);
+}
+.prose-vaidya hr { border: 0; border-top: 1px solid rgba(122, 74, 18, 0.2); margin: 0.7em 0; }

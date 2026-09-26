@@ -1,0 +1,623 @@
+{
+  "profiles": [
+    {
+      "id": 1,
+      "user_id": "demo-vaidya-1",
+      "username": "vaidya.meera",
+      "full_name": "Vaidya Meera Nair",
+      "bio": "Kerala panchakarma physician · 15 yrs clinical practice",
+      "avatar_url": null,
+      "created_at": "2026-09-20T22:28:25.463Z"
+    },
+    {
+      "id": 2,
+      "user_id": "demo-vaidya-2",
+      "username": "arjun.rasa",
+      "full_name": "Arjun Rasa",
+      "bio": "Rasashastra student & herbal grower · medicinal chemistry",
+      "avatar_url": null,
+      "created_at": "2026-09-21T01:48:25.463Z"
+    },
+    {
+      "id": 3,
+      "user_id": "demo-vaidya-3",
+      "username": "tulsi.threads",
+      "full_name": "Tulsi Threads",
+      "bio": "Ayurvedic kitchen · recipes & living rituals",
+      "avatar_url": null,
+      "created_at": "2026-09-21T05:08:25.463Z"
+    },
+    {
+      "id": 4,
+      "user_id": "vaidya-lakshmi",
+      "username": "vaidya.lakshmi",
+      "full_name": "Vaidya Lakshmi Menon",
+      "bio": "Kerala panchakarma consultant · Karkidaka chikitsa",
+      "avatar_url": null,
+      "created_at": "2026-09-21T06:48:25.463Z"
+    },
+    {
+      "id": 5,
+      "user_id": "raghavan-siddha",
+      "username": "raghavan.siddha",
+      "full_name": "Dr. S. Raghavan",
+      "bio": "Tamil Nadu vaidya & palm-leaf manuscript researcher",
+      "avatar_url": null,
+      "created_at": "2026-09-21T08:28:25.463Z"
+    },
+    {
+      "id": 6,
+      "user_id": "prakash-bhat",
+      "username": "prakash.bhat",
+      "full_name": "Vaidya Prakash Bhat",
+      "bio": "Mysuru ashtanga-vaidya & herb curator",
+      "avatar_url": null,
+      "created_at": "2026-09-21T10:08:25.463Z"
+    },
+    {
+      "id": 7,
+      "user_id": "anjali-d",
+      "username": "anjali.d",
+      "full_name": "Dr. Anjali Deshmukh",
+      "bio": "Pune stri-roga specialist · maternal wellness",
+      "avatar_url": null,
+      "created_at": "2026-09-21T11:48:25.463Z"
+    },
+    {
+      "id": 8,
+      "user_id": "k-patel",
+      "username": "k.patel",
+      "full_name": "Vaidya Kanaiyalal Patel",
+      "bio": "Ahmedabad rasashastra pharmacist & bhavana master",
+      "avatar_url": null,
+      "created_at": "2026-09-21T13:28:25.463Z"
+    },
+    {
+      "id": 9,
+      "user_id": "ritu-rathore",
+      "username": "ritu.rathore",
+      "full_name": "Dr. Ritu Rathore",
+      "bio": "Jaipur desert-climate consultant & ritucharya guide",
+      "avatar_url": null,
+      "created_at": "2026-09-21T15:08:25.463Z"
+    },
+    {
+      "id": 10,
+      "user_id": "harpreet-s",
+      "username": "harpreet.s",
+      "full_name": "Vaidya Harpreet Singh",
+      "bio": "Amritsar vata-vyadhi physician & joint specialist",
+      "avatar_url": null,
+      "created_at": "2026-09-21T16:48:25.463Z"
+    },
+    {
+      "id": 11,
+      "user_id": "chandrima-b",
+      "username": "chandrima.b",
+      "full_name": "Dr. Chandrima Bose",
+      "bio": "Kolkata kaviraj lineage holder · classical botany",
+      "avatar_url": null,
+      "created_at": "2026-09-21T18:28:25.463Z"
+    },
+    {
+      "id": 12,
+      "user_id": "dibakar-das",
+      "username": "dibakar.das",
+      "full_name": "Vaidya Dibakar Das",
+      "bio": "Guwahati folk-formula documentarian & ethno-botanist",
+      "avatar_url": null,
+      "created_at": "2026-09-21T20:08:25.463Z"
+    },
+    {
+      "id": 13,
+      "user_id": "rinchen-d",
+      "username": "rinchen.d",
+      "full_name": "Dr. Rinchen Dolma",
+      "bio": "Leh Sowa Rigpa amchi & Himalayan alpine herbalist",
+      "avatar_url": null,
+      "created_at": "2026-09-21T21:48:25.463Z"
+    },
+    {
+      "id": 14,
+      "user_id": "vikram-aditya",
+      "username": "vikram.aditya",
+      "full_name": "Vaidya Vikram Aditya",
+      "bio": "Varanasi BHU faculty · Charaka Samhita lecturer",
+      "avatar_url": null,
+      "created_at": "2026-09-21T23:28:25.463Z"
+    },
+    {
+      "id": 15,
+      "user_id": "meera-k",
+      "username": "meera.k",
+      "full_name": "Dr. Meera Krishnan",
+      "bio": "Coimbatore yoga-ayurveda integrator & pranayama mentor",
+      "avatar_url": null,
+      "created_at": "2026-09-22T01:08:25.463Z"
+    },
+    {
+      "id": 16,
+      "user_id": "farooq-a",
+      "username": "farooq.a",
+      "full_name": "Vaidya Farooq Ahmed",
+      "bio": "Srinagar unani-ayurveda bridge physician · temperament studies",
+      "avatar_url": null,
+      "created_at": "2026-09-22T02:48:25.463Z"
+    },
+    {
+      "id": 17,
+      "user_id": "sunita-p",
+      "username": "sunita.p",
+      "full_name": "Dr. Sunita Patnaik",
+      "bio": "Bhubaneswar dietetics researcher & pathya kitchen architect",
+      "avatar_url": null,
+      "created_at": "2026-09-22T04:28:25.463Z"
+    },
+    {
+      "id": 18,
+      "user_id": "tashi-w",
+      "username": "tashi.w",
+      "full_name": "Vaidya Tashi Wangmu",
+      "bio": "Gangtok high-altitude medicine & cordyceps researcher",
+      "avatar_url": null,
+      "created_at": "2026-09-22T06:08:25.463Z"
+    },
+    {
+      "id": 19,
+      "user_id": "arvind-nair",
+      "username": "arvind.nair",
+      "full_name": "Dr. Arvind Nair",
+      "bio": "Delhi respiratory specialist & pippali rasayana researcher",
+      "avatar_url": null,
+      "created_at": "2026-09-22T07:48:25.463Z"
+    },
+    {
+      "user_id": "test-user-1790243305480",
+      "username": "aaradhya_ayur",
+      "full_name": "Aaradhya Sharma",
+      "bio": "Alchemist of Himalayan herbs and dosha balancing",
+      "avatar_url": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120",
+      "id": 20,
+      "created_at": "2026-09-24T09:48:25.494Z",
+      "_docId": "20"
+    },
+    {
+      "user_id": "LCCzp5cvMQUChN7PDce1ikSBwri2",
+      "username": "skoustav35",
+      "full_name": "Koustav Sarkar",
+      "bio": "New weaver in the atelier.",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocLiDP7hXqJc6ncNE0BFyY60Yz69eC9JfZSVUuX3XeweL4UtdA=s96-c",
+      "id": 21,
+      "created_at": "2026-09-24T10:02:47.371Z",
+      "_docId": "21"
+    }
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "name": "Dinacharya Club",
+      "slug": "dinacharya-club",
+      "description": "Daily routine check-ins, sunrise oiling, and seasonal tweaks.",
+      "kind": "circle",
+      "owner_id": "demo-vaidya-1",
+      "tags": [
+        "dinacharya",
+        "routine",
+        "ayurveda"
+      ],
+      "member_count": 148,
+      "conversation_id": 1,
+      "created_at": "2026-09-22T07:48:25.463Z"
+    },
+    {
+      "id": 2,
+      "name": "Rasa Lab",
+      "slug": "rasa-lab",
+      "description": "Classical pharmacy study circle & mineral purification assays.",
+      "kind": "study",
+      "owner_id": "demo-vaidya-2",
+      "tags": [
+        "rasashastra",
+        "shodhana",
+        "chemistry"
+      ],
+      "member_count": 94,
+      "conversation_id": 2,
+      "created_at": "2026-09-22T16:08:25.463Z"
+    },
+    {
+      "id": 3,
+      "name": "Atelier Scribes",
+      "slug": "atelier-scribes",
+      "description": "Bengali verse, poetic meter, prose translations and Sanskrit rhythms.",
+      "kind": "circle",
+      "owner_id": "demo-vaidya-3",
+      "tags": [
+        "poetry",
+        "tagore",
+        "manuscripts"
+      ],
+      "member_count": 220,
+      "conversation_id": 3,
+      "created_at": "2026-09-23T00:28:25.463Z"
+    },
+    {
+      "id": 4,
+      "name": "AyurML Collective",
+      "slug": "ayurml-collective",
+      "description": "Ancient diagnostic taxonomy meets modern neural embeddings.",
+      "kind": "study",
+      "owner_id": "demo-vaidya-1",
+      "tags": [
+        "transformers",
+        "machine-learning",
+        "taxonomy"
+      ],
+      "member_count": 76,
+      "conversation_id": 4,
+      "created_at": "2026-09-23T03:48:25.463Z"
+    }
+  ],
+  "posts": [
+    {
+      "id": 1,
+      "kind": "visual",
+      "author_id": "demo-vaidya-1",
+      "author_name": "Vaidya Meera Nair",
+      "author_username": "vaidya.meera",
+      "author_avatar": null,
+      "caption": "Morning abhyanga — warm sesame oil, slow strokes, before sunrise. The nervous system drinks it first. Never heat oil twice.",
+      "title": "The Ritual of Dawn Abhyanga",
+      "summary": "A mindful guide to traditional sesame oil massage before the first rays of sun.",
+      "content_md": null,
+      "media_url": null,
+      "media_type": "image",
+      "tags": [
+        "abhyanga",
+        "dinacharya",
+        "vata",
+        "ayurveda"
+      ],
+      "likes_count": 142,
+      "saves_count": 67,
+      "comments_count": 12,
+      "views_count": 1240,
+      "created_at": "2026-09-24T06:48:25.463Z"
+    },
+    {
+      "id": 2,
+      "kind": "forge",
+      "author_id": "demo-vaidya-2",
+      "author_name": "Arjun Rasa",
+      "author_username": "arjun.rasa",
+      "author_avatar": null,
+      "caption": null,
+      "title": "Rasashastra notes: what shodhana actually removes",
+      "summary": "Purification is not symbolism — a practical look at herbal decoction cycles, quenching temperatures, and mineral assay results.",
+      "content_md": "# Shodhana, practically\n\nShodhana (purification) of metals and minerals uses repeated quenching in herbal decoctions. Each cycle transforms brittle crystalline structures into biologically absorbable nano-aggregates.\n\n## The Three Triphala Quenches\nWhen gold and copper sheets are heated to cherry-red and immersed in fresh Triphala kwatha, tannin-metal chelates form immediately at the surface.\n\n$$\\text{Surface Reduction Rate} = k \\cdot [\\text{Tannins}] \\cdot \\Delta T$$\n\nObserve the colour transition from brassy brilliance to deep ochre.",
+      "media_url": null,
+      "media_type": null,
+      "tags": [
+        "rasashastra",
+        "shodhana",
+        "chemistry",
+        "ayurveda"
+      ],
+      "read_minutes": 5,
+      "likes_count": 218,
+      "saves_count": 95,
+      "comments_count": 18,
+      "views_count": 2480,
+      "created_at": "2026-09-24T03:48:25.463Z"
+    },
+    {
+      "id": 3,
+      "kind": "visual",
+      "author_id": "demo-vaidya-3",
+      "author_name": "Tulsi Threads",
+      "author_username": "tulsi.threads",
+      "author_avatar": null,
+      "caption": "Golden milk, done right: cracked black pepper + grass-fed ghee + low simmer for 7 minutes. Piperine unlocks curcumin assimilation by 2000%.",
+      "title": "Golden Milk & Turmeric Alchemy",
+      "summary": "How ordinary kitchen spices transform into liquid gold through fat-soluble extraction.",
+      "content_md": null,
+      "media_url": null,
+      "media_type": "image",
+      "tags": [
+        "turmeric",
+        "recipes",
+        "haldi",
+        "kapha",
+        "chai"
+      ],
+      "likes_count": 310,
+      "saves_count": 140,
+      "comments_count": 24,
+      "views_count": 3600,
+      "created_at": "2026-09-24T08:18:25.463Z"
+    },
+    {
+      "id": 4,
+      "kind": "forge",
+      "author_id": "demo-vaidya-1",
+      "author_name": "Vaidya Meera Nair",
+      "author_username": "vaidya.meera",
+      "author_avatar": null,
+      "caption": null,
+      "title": "Reading your prakriti without a 20-question quiz",
+      "summary": "Forget the superficial online quizzes. Here is how a traditional vaidya reads constitution in the first five minutes using pulse, tongue, and gait.",
+      "content_md": "# Prakriti, clinically\n\n*Nadi, jihva, sparsha* — pulse, tongue, touch. Before any questionnaire is opened, the body reveals its elemental dominance in the speed of the breath and the warmth of the hands.\n\n### 1. The Vata Pulse (Sarpa Gati)\nFelt on the radial edge — fast, thin, winding like a serpent.\n\n### 2. The Pitta Pulse (Manduka Gati)\nStrong, rhythmic, leaping like a frog.\n\n### 3. The Kapha Pulse (Hamsa Gati)\nSlow, steady, undulating like a gliding swan.",
+      "media_url": null,
+      "media_type": null,
+      "tags": [
+        "prakriti",
+        "diagnosis",
+        "dosha",
+        "ayurveda"
+      ],
+      "read_minutes": 6,
+      "likes_count": 480,
+      "saves_count": 230,
+      "comments_count": 36,
+      "views_count": 5100,
+      "created_at": "2026-09-23T21:48:25.463Z"
+    },
+    {
+      "id": 5,
+      "kind": "forge",
+      "author_id": "vaidya-lakshmi",
+      "author_name": "Vaidya Lakshmi Menon",
+      "author_username": "vaidya.lakshmi",
+      "author_avatar": null,
+      "caption": null,
+      "title": "Karkidaka Chikitsa: when the monsoon resets agni",
+      "summary": "Why July in Kerala is the sacred window for marma rejuvenation and medicinal kanji porridges.",
+      "content_md": "# The Monsoon Window\n\nDuring the peak rains of Karkidakam, the body’s srotas (channels) naturally soften and dilate under high atmospheric humidity. It is the only season where deep tissue purification occurs with minimal metabolic friction.",
+      "media_url": null,
+      "media_type": null,
+      "tags": [
+        "kerala",
+        "monsoon",
+        "panchakarma",
+        "ritucharya"
+      ],
+      "read_minutes": 4,
+      "likes_count": 175,
+      "saves_count": 82,
+      "comments_count": 14,
+      "views_count": 1980,
+      "created_at": "2026-09-23T17:58:25.463Z"
+    },
+    {
+      "id": 6,
+      "kind": "visual",
+      "author_id": "demo-vaidya-3",
+      "author_name": "Tulsi Threads",
+      "author_username": "tulsi.threads",
+      "author_avatar": null,
+      "caption": "Bengali monsoon poetry recitation with cardamom tea on the verandah. Rain on the river ghats.",
+      "title": "Bengali Poetry & Monsoon Chai",
+      "summary": "A quiet afternoon of verse recitation and freshly crushed green cardamom tea.",
+      "content_md": null,
+      "media_url": null,
+      "media_type": "video",
+      "media_duration": 142,
+      "tags": [
+        "poetry",
+        "recitation",
+        "bengali",
+        "chai",
+        "tea"
+      ],
+      "likes_count": 260,
+      "saves_count": 110,
+      "comments_count": 29,
+      "views_count": 3200,
+      "created_at": "2026-09-24T07:48:25.463Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": 1,
+      "name": "Dinacharya Club",
+      "is_group": true,
+      "created_by": "demo-vaidya-1",
+      "last_message_at": "2026-09-24T09:18:25.463Z",
+      "created_at": "2026-09-22T07:48:25.463Z"
+    },
+    {
+      "id": 2,
+      "name": null,
+      "is_group": false,
+      "created_by": "demo-vaidya-2",
+      "last_message_at": "2026-09-24T06:48:25.463Z",
+      "created_at": "2026-09-22T11:08:25.463Z"
+    },
+    {
+      "id": 3,
+      "name": null,
+      "is_group": false,
+      "created_by": "vaidya-lakshmi",
+      "last_message_at": "2026-09-24T02:48:25.463Z",
+      "created_at": "2026-09-22T12:48:25.463Z"
+    }
+  ],
+  "conversation_members": [
+    {
+      "id": 1,
+      "conversation_id": 1,
+      "user_id": "demo-vaidya-1",
+      "last_read_at": "2026-09-24T09:13:25.463Z",
+      "created_at": "2026-09-22T07:48:25.463Z"
+    },
+    {
+      "id": 2,
+      "conversation_id": 1,
+      "user_id": "demo-vaidya-3",
+      "last_read_at": "2026-09-24T09:08:25.463Z",
+      "created_at": "2026-09-22T09:28:25.463Z"
+    },
+    {
+      "id": 3,
+      "conversation_id": 2,
+      "user_id": "demo-vaidya-1",
+      "last_read_at": "2026-09-24T06:38:25.463Z",
+      "created_at": "2026-09-22T11:08:25.463Z"
+    },
+    {
+      "id": 4,
+      "conversation_id": 2,
+      "user_id": "demo-vaidya-2",
+      "last_read_at": "2026-09-24T06:48:25.463Z",
+      "created_at": "2026-09-22T11:08:25.463Z"
+    },
+    {
+      "id": 5,
+      "conversation_id": 3,
+      "user_id": "demo-vaidya-1",
+      "last_read_at": "2026-09-24T02:38:25.463Z",
+      "created_at": "2026-09-22T12:48:25.463Z"
+    },
+    {
+      "id": 6,
+      "conversation_id": 3,
+      "user_id": "vaidya-lakshmi",
+      "last_read_at": "2026-09-24T02:48:25.463Z",
+      "created_at": "2026-09-22T12:48:25.463Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": 1,
+      "conversation_id": 1,
+      "sender_id": "demo-vaidya-3",
+      "type": "text",
+      "body": "Did my abhyanga before 6 today — reporting for duty 🌿",
+      "media_url": null,
+      "post_id": null,
+      "sender_name": "Tulsi Threads",
+      "sender_avatar": null,
+      "created_at": "2026-09-24T09:03:25.463Z"
+    },
+    {
+      "id": 2,
+      "conversation_id": 1,
+      "sender_id": "demo-vaidya-1",
+      "type": "text",
+      "body": "Beautiful. Keep the oil warm, not hot — sukha, not sweat.",
+      "media_url": null,
+      "post_id": null,
+      "sender_name": "Vaidya Meera Nair",
+      "sender_avatar": null,
+      "created_at": "2026-09-24T09:18:25.463Z"
+    },
+    {
+      "id": 3,
+      "conversation_id": 2,
+      "sender_id": "demo-vaidya-2",
+      "type": "text",
+      "body": "The assay showed zero free sulphur after 7 cycles.",
+      "media_url": null,
+      "post_id": null,
+      "sender_name": "Arjun Rasa",
+      "sender_avatar": null,
+      "created_at": "2026-09-24T06:48:25.463Z"
+    },
+    {
+      "id": 4,
+      "conversation_id": 3,
+      "sender_id": "vaidya-lakshmi",
+      "type": "text",
+      "body": "Sending the Karkidaka kanji recipe scroll across.",
+      "media_url": null,
+      "post_id": null,
+      "sender_name": "Vaidya Lakshmi Menon",
+      "sender_avatar": null,
+      "created_at": "2026-09-24T02:48:25.463Z"
+    }
+  ],
+  "group_members": [
+    {
+      "user_id": "demo-vaidya-1",
+      "group_id": 1,
+      "created_at": "2026-09-16T06:21:18.540Z",
+      "id": 1,
+      "role": "admin",
+      "_docId": "1"
+    },
+    {
+      "created_at": "2026-09-16T08:01:18.540Z",
+      "id": 2,
+      "group_id": 1,
+      "role": "member",
+      "user_id": "demo-vaidya-3",
+      "_docId": "2"
+    }
+  ],
+  "follows": [
+    {
+      "created_at": "2026-09-15T13:41:18.540Z",
+      "id": 1,
+      "followee_id": "demo-vaidya-1",
+      "follower_id": "demo-vaidya-2",
+      "_docId": "demo-vaidya-2_demo-vaidya-1"
+    },
+    {
+      "id": 2,
+      "created_at": "2026-09-15T15:21:18.540Z",
+      "follower_id": "demo-vaidya-3",
+      "followee_id": "demo-vaidya-1",
+      "_docId": "demo-vaidya-3_demo-vaidya-1"
+    }
+  ],
+  "likes": [],
+  "saves": [],
+  "signals": [
+    {
+      "user_id": "LCCzp5cvMQUChN7PDce1ikSBwri2",
+      "type": "dwell",
+      "post_id": 3,
+      "tags": [
+        "turmeric",
+        "recipes",
+        "haldi",
+        "kapha",
+        "chai"
+      ],
+      "query": null,
+      "dwell_ms": 2111,
+      "kind": "visual",
+      "id": 1790244784877,
+      "created_at": "2026-09-24T10:13:04.877Z",
+      "_docId": "1790244784877"
+    }
+  ],
+  "user_prefs": [],
+  "notifications": [],
+  "statuses": [
+    {
+      "created_at": "2026-09-18T06:51:18.540Z",
+      "caption": "Tulsi harvest day 🌱",
+      "user_id": "demo-vaidya-3",
+      "id": 1,
+      "media_url": null,
+      "_docId": "1"
+    }
+  ],
+  "comments": [],
+  "boosts": [
+    {
+      "status": "active",
+      "target_type": "post",
+      "created_at": "2026-09-18T07:21:18.540Z",
+      "post_id": 3,
+      "goal_type": "reach",
+      "user_id": "demo-vaidya-3",
+      "expires_at": "2026-09-24T08:21:18.540Z",
+      "id": 1,
+      "_docId": "1"
+    }
+  ],
+  "reports": [],
+  "api_tokens": []
+}

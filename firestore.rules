@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(userId) { return signedIn() && request.auth.uid == userId; }
+    function isMember(conversationId) {
+      return signedIn() && exists(/databases/$(database)/documents/conversation_members/$(request.auth.uid + '_' + conversationId));
+    }
+
+    // Social graph — public read, owned write
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.author_id == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.author_id == request.auth.uid ||
+        // engagement counter bumps: only counter fields may change
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['likes_count', 'saves_count', 'comments_count', 'views_count'])
+      );
+      allow delete: if signedIn() && resource.data.author_id == request.auth.uid;
+    }
+
+    match /comments/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    match /likes/{id} {
+      allow read: if signedIn();
+      allow create, delete: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      // allow delete via resource check
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    match /saves/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    match /follows/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.follower_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.follower_id == request.auth.uid;
+    }
+
+    match /profiles/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(request.resource.data.user_id);
+    }
+
+    match /signals/{id} {
+      allow read, write: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    match /notifications/{id} {
+      allow read, update: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.actor_id == request.auth.uid;
+    }
+
+    // Circles
+    match /groups/{groupId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.owner_id == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.owner_id == request.auth.uid;
+    }
+    match /group_members/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow update: if signedIn();
+    }
+    match /group_posts/{id} {
+      allow read: if true;
+      allow create, delete: if signedIn();
+    }
+
+    // Threads — member-scoped
+    match /conversations/{convId} {
+      allow read, update: if signedIn();
+      allow create: if signedIn() && request.resource.data.created_by == request.auth.uid;
+    }
+    match /conversation_members/{id} {
+      allow read, write: if signedIn();
+    }
+    match /messages/{msgId} {
+      allow read, create, update: if signedIn();
+      allow delete: if signedIn() && resource.data.sender_id == request.auth.uid;
+    }
+
+    // Stories / prefs / monetisation
+    match /statuses/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+    match /user_prefs/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /boosts/{id} {
+      allow read: if true;
+      allow create, update: if signedIn() && request.resource.data.user_id == request.auth.uid;
+    }
+    match /payout_requests/{id} {
+      allow read, write: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Vault (aux project tables folded in)
+    match /api_tokens/{id} {
+      allow read, write: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+    }
+    match /media_blobs/{id} {
+      allow read: if true;
+      allow create: if signedIn();
+    }
+  }
+}

@@ -1,0 +1,30 @@
+# AyurVerse society — the forever pulse
+# Zero-config path: the workflow reads the beat URL from society-beat-url.txt
+# (committed, public-by-design — the pulse is a hallway bell, not a key).
+# If you set repo secret SOCIETY_CRON_SECRET and the same value in the app's
+# env, the tick switches to strict mode and the workflow hands it over too.
+name: society-pulse
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: resolve beat url
+        id: cfg
+        shell: bash
+        run: |
+          URL="${{ vars.SOCIETY_BEAT_URL }}"
+          if [ -z "$URL" ]; then URL="$(cat society-beat-url.txt 2>/dev/null | tr -d '[:space:]')"; fi
+          if [ -z "$URL" ]; then echo "::error::set repo Actions variable SOCIETY_BEAT_URL or commit society-beat-url.txt"; exit 1; fi
+          echo "beat_url=$URL" >> $GITHUB_OUTPUT
+      - name: beat the loom
+        env:
+          SECRET: ${{ secrets.SOCIETY_CRON_SECRET }}
+          URL: ${{ steps.cfg.outputs.beat_url }}
+        run: |
+          curl -fsS --max-time 60 -H "x-loom-wake: ember" "$URL?secret=$SECRET&beat=8" | python3 -m json.tool

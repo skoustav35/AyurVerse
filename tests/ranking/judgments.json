@@ -1,0 +1,54 @@
+{
+  "k": 10,
+  "note": "Synthetic ranking judgments fixture. Labels are fabricated for offline evaluation only; no live credentials or network access are used.",
+  "cases": [
+    {
+      "id": "c1",
+      "segment": "ayurveda",
+      "ranked": ["p1", "p2", "p3", "p4", "p5"],
+      "relevance": { "p1": 3, "p2": 0, "p3": 2, "p4": 0, "p5": 1 }
+    },
+    {
+      "id": "c2",
+      "segment": "ayurveda",
+      "ranked": ["p9", "p1", "p2"],
+      "relevance": { "p1": 2, "p2": 3, "p9": 1 }
+    },
+    {
+      "id": "c3",
+      "segment": "wellness",
+      "ranked": ["w1", "w2", "w3"],
+      "relevance": { "w1": 0, "w2": 0, "w3": 0 }
+    },
+    {
+      "id": "c4",
+      "segment": "wellness",
+      "ranked": ["w1", "w1", "w2", "w4"],
+      "relevance": { "w1": 1, "w2": 2, "w4": 3 }
+    },
+    {
+      "id": "c5",
+      "segment": "recipes",
+      "ranked": ["r1", "r2", "r3", "r4", "r5", "r6"],
+      "relevance": { "r1": 3, "r2": 3, "r3": 2, "r4": 2, "r5": 1, "r6": 0 }
+    },
+    {
+      "id": "c6",
+      "segment": "recipes",
+      "ranked": ["r6", "r5", "r4", "r3", "r2", "r1"],
+      "relevance": { "r1": 3, "r2": 3, "r3": 2, "r4": 2, "r5": 1, "r6": 0 }
+    },
+    {
+      "id": "c7",
+      "segment": "events",
+      "ranked": ["e1", "e2"],
+      "relevance": { "e1": 2, "e2": 1 }
+    },
+    {
+      "id": "c8",
+      "segment": "events",
+      "ranked": [],
+      "relevance": { "e1": 1, "e2": 0 }
+    }
+  ]
+}

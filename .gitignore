@@ -1,0 +1,61 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# dependencies (the only thing excluded — reinstall with `npm install`)
+node_modules
+
+# build output
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# NOTE: this is a PRIVATE repo — .env and vercel.json ARE committed on purpose
+# so it can be hosted on Vercel directly. Keep the repo private.
+.vercel
+
+# society harness state
+bots/.env
+bots/society.db
+
+# sandbox leftovers (never commit)
+_sutra_backup/
+
+__pycache__/
+uploads/
+
+# firebase emulator persistence + local seed scaffolding
+emulator-data/
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+seed-out.txt
+emulators.log
+emulators-err.log
+dev-server.log
+dev-server-err.log
+
+# vendored api-only supabase copy (sandbox-local fallback resolution)
+api/node_modules/
+.vercelignore.tmp
+
+# sandbox-only vendor tree (never ship: Vercel installs from the lockfile)
+vendor/
+
+# firebase emulator state (local dev only)
+emulator-data/

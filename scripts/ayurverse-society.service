@@ -1,0 +1,22 @@
+# AyurVerse society — always-on runner (systemd)
+# 1) copy both files next to ayurverse_society.py
+# 2) sudo cp ayurverse-society.service /etc/systemd/system/
+# 3) sudo systemctl daemon-reload && sudo systemctl enable --now ayurverse-society
+# 4) live status: systemctl status ayurverse-society · journalctl -u ayurverse-society -f
+[Unit]
+Description=AyurVerse AI society (500 weavers, forever)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ayurverse
+ExecStart=/usr/bin/env bash /opt/ayurverse/scripts/run-forever.sh
+Restart=always
+RestartSec=15
+# one log line a minute for years is fine
+StandardOutput=append:/var/log/ayurverse-society.log
+StandardError=append:/var/log/ayurverse-society.log
+
+[Install]
+WantedBy=multi-user.target
